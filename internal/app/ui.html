@@ -1,0 +1,784 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gust</title>
+<style>
+  :root{
+    --ink:#0a0a0b; --paper:#ded8ca;
+    --bg:var(--ink); --surface:var(--ink); --raised:var(--ink); --line:var(--paper);
+    --text:var(--paper); --dim:var(--paper); --faint:var(--paper);
+    --ok:var(--paper); --warn:var(--paper); --bad:var(--paper); --acc:var(--paper); --on-acc:var(--ink);
+    --r-lg:0; --r-md:0; --r-sm:0;
+    --font:"Segoe UI","Segoe UI Variable Text",system-ui,Arial,sans-serif;
+    --font-d:"Courier New",Consolas,monospace;
+    --dots:url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAQAAAAEAQMAAACTPww9AAAABlBMVEUKCgve2MosCnmKAAAAEElEQVR4XmNYwCDAsIDBAQAG2AGRSpdG4QAAAABJRU5ErkJggg==");
+  }
+  *{box-sizing:border-box}
+  html{color-scheme:dark}
+  body{margin:0;background:var(--ink);color:var(--text);font:15px/1.5 var(--font);-webkit-font-smoothing:none}
+  #bg{position:fixed;inset:0;z-index:0;background:var(--ink) right bottom/cover no-repeat;image-rendering:pixelated;transition:none}
+  #bg[data-v="eye"]{background-image:url("data:image/png;base64,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")}
+  #bg[data-v="stairs"]{background-image:url("data:image/png;base64,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")}
+  #bg[data-v="chain"]{background-image:url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAoAAAAGQAQMAAAAEPUNmAAAABlBMVEXe2MoKCgtNjEq+AAAJVklEQVR42u2cT4gnxRXHv93Ts3YyIdsjbiAK8stAZME9KJjTuqQDA7nMxejBQw5eEsjRQ8LEP2zpafAgngKuF88iIhJhw/5ga8EFjxNIvGW28SAJBn5lNNq7v94uD/Wnq7p79NdVtfx6d/p3mJmdP2/f79Wn3ntV/d6LOMK+YkwC7yWBN0ML5OTE2bDMJw7vfYEpvTvfcjSFgEngJHCKy1Ncnjic4vIUlyeBk8BJ4BSXp7g8CZzi8hSXJ4GTwCkurxaXHZ0DAVCm+kvr/3F+fXOx77tTXD4JAl04lORJDtsojojDKS7fNQITVwqP++YJXOXE8e9KIC2BdNQ7ZaRx2RBSpr3fP3lxOXGEEEBZis+pv0AhIk3TkxCXiW1G037kxMblxJVC4Q87lpxiyqqZYc9GVD+cbLgqhQRAuk+05dIpLg/CsDwmJMgfh/aHjtlXAYDNCgCzMOncDABjswAclo2x2GHe2C4NwKEWGOIt1wDquu7BLnHfD3Ece3JI+ilsgTgKDgugBsqjI8QdEtcdl0sjiRH+UBkvHVHmANRAAczEh3g8uY2NYYEZCr3CDYhjsGGBWrqwQu7C2Xg4NDCske6TuAviGGwoKASWm9KU8R29JV79LZsYqoVulri5016/PyxqFaQePlJqznwWRf8x+9+O7yprDGugADvMmyXWII4gLteCQuDfnzwsjRB7CYwhTXf/rR2fuGxhWJvyWyCub6fYGBKUQi3SAnGt3kZhKNf5h38ixhorENfvD4V6JQhmKECQtkBcn4ZEY6golFFPrbEE0VlDipwCufc1i1CPlFrDFMQCcZ2r3MIQZ/efgwVi6hP1lsvl1eWVpX9MqVEICoGNn1y6BOCgBeK6vE3jDk1niA6IrhzSCigPCJC0URwosKgVhTpItUB05pBxXMuReXJIANRFJ4zuGA7RTcMKFGAZAOz67WWBoX2iJ6kJoqsNORhonkXO3oYcj6FaY4/chlYAWHlAsi6IwwSaGBrneRNERxsu1J9GmTOH0h3q5EvFZe1siDuHFQUHkNMIQJ542NDEUEc9G0Q3G3IGABkDOiSuakPN4ZGRvRcaxMYhumhIKzAO5IcMUQYkuSeH+x0NU+LJIeMAxY+eoMg7IK4usGxhqOOyAlE4RBcNKwrOgDOPUmC7DeJwDkt1pt94We2UA18OOUMFWh6QPAG2nWzY5w6NbM5wiA4a0goLQMblCJkN4iCBFoZG1EvRgOhiQ8aBudq5eQvEwRwWOpKywwaYHe0QHTSsKAfT/9puheZBAi13aB7ADRBdbMgZKiq/3m2DmDi6Q1rJNWk7RAcN5wJDwSEiZH4c6qjMAJ3NpX4cLgSGm0sASFogriyw5Q4rih9/kGvXJR2iE4cVqAx6j9EeEAdzqDDkmKGIgnCoMMwPGYBdPw6VO6QV8BwtdAxtHOJwDZU7lBoish3iYA73tQubZYeKGD8OJYZylX05bDDkZ/82a4jZ8eBQYijiMoBtDw4bd8gZtv5INDIHUJeAThxqb4guiKtzaLnDORi3YmjszqFyh/jktbfFm8ycOTzSYZlx4Pzzz8AE0YPDOQDc/C0/R7ogunFYUfDTBa49pUHUgdmdw38SfHlZcGhmiEM5lNkhZ7hy/a039xQyDYeDLoLiHQDvCA4j/tneqd93OVxNw3ZYnoOd+k+Gi68G5HDzPMWZzyWHxpl5iEAjPVzgoZ8TbH1IJDKNQ3Tm8MznQstQHPJzHwHRjccVMu4cVrjKAOAf54Do15c7gXmIQCMsc3Z5F0j+urfdDszDbSjCMn/qfQC/eQ/AbhgOb8wAPHk9C8Vh9EsK4IH/dgLzUA5lerjgrzwJJA8+EoBDEZYbDb04VOlhRU/9gQA4HStkdII4nEPhDm9vAMDmiwTIIn8OOdv4M6HIT/8/CIcVVQn25rLjEFdzsF0O6y8A4L4X3pDI+HC40LqJj2E43PqwApKNl6+F4tDQMPmVN4cVrnJhw9dIKA4NDe0E0ZXDrS9Akd934e+h/OGxHLr6Q81hKH8YnMONCy8BydYvAvhDxjE3vU2guNz2hx5xWXBoxBQ7Lidux2W++OlfgOTBzwQxl/w5NDQMGZcvfBQsLhuZQ6D88HIK4Ku9cPmhzr6C5oeLn4U7p+gM1oND65zy0O8Its5cajj0PS/rU4DTOaV9Xp4DX4c+p0RPvxs9/W7I8/KV62+9uRfyvKxOo2E4BA1/XlYn+nD3NueffybYvQ1ocyvizCFK695G3hIn5kW2572NUinY/aHxMDjM/aH0LmHusc2HC9732NbjlJD32CxDoHtsmBeI7XvsgRzqx3rqIVcO73vsNoh2WB7V8xT1nt05tC6yQWE8CfZ9rmdwaJ+WvZ7rGa8Az/VAFYatSoehz5ePzBKZhpc4xPPlXnfo83wZRgONH4cGiB0M3Z8v2y8vDi2PGLLOoRdD5zoHVADNk27BjUedA3oLv1w0nEOD2Clz8Km3sQq/POu+FqKyAzm8621Qv51/F4ZuHIJCkJhFIeu+GgQC1H2ZO0X6oDxQ/WGV2IWwThrOATDwCOiUfY2m/pDxZqfArw7WKPwCWvWHB2SYhs1UDSP7yhO5Mv51sL0YetTBgqHJOF3rD4uZWYCInvJDx3psUb5jlfAEqMc2gnKQemwYCadfPbYAkeYdDH36UyrhsdvO0EGg0RfQBGWzLyBYbwWPnPtTjr4DQycOeQSAogKSngYVj/6UXgzX3idl9qe0MRxBnxTNrT6pZntYDXsDGlIurvJLLv16dmi2GvbIem3Io7ulX88isdWuN4b+Za1eqZqqLQyd+6Qu+nJogYjamBRh942OwIbHdnKNoUu9aaOvW8Ni7kQfvcwRHQTKPvrlWfxL9tGXaZNyOmvIf1AiqXxsSKzhNsWtErj5bGugg888B5YB5cd5iPFcYp/EM5lEtOY5JHBspGcA8KmvhsY8h1uvA7dfDDhX5LhVdhJYA4XkcHxzRfrn2xjjHMYxm6WAMXFihPNturdzJMycpWA25FHXY4/Ehn0gVkm4eV+cc35VfXHDeZ5DQ2JsTwUZyyqX3bm6ZLRz56wBav4asiyADQl6XWIqrrGIg4Y9avHobhtnnbiO4STmp4/z5irQbQ/fPvZUcK/ZkKBDYntY+4C3THPc0fGtdTzaebC9e9lLYJKMeTQ9/745665ziY/9yRi3Hh0fh/17+eTOJf4WrnR4qfCclUkAAAAASUVORK5CYII=")}
+  #bg[data-v="grin"]{background-image:url("data:image/png;base64,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")}
+  #bg[data-v="hole"]{background-image:url("data:image/png;base64,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")}
+  ::selection{background:var(--paper);color:var(--ink)}
+  :focus-visible{outline:1px dashed var(--paper);outline-offset:3px}
+  .wrap{position:relative;z-index:1;max-width:620px;margin:0 0 0 4vw;padding:22px 16px 56px}
+  ::-webkit-scrollbar{width:8px}::-webkit-scrollbar-thumb{background:var(--paper)}::-webkit-scrollbar-track{background:var(--ink)}
+
+  .top{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:22px;flex-wrap:wrap}
+  .brand{display:flex;align-items:baseline;gap:12px}
+  .brand h1{margin:0;font:400 22px/1 var(--font-d);letter-spacing:.5em}
+  .brand span{font:12px var(--font-d);opacity:1}
+  nav{display:flex;gap:0;background:var(--ink);border:1px solid var(--paper)}
+  nav button{border:0;background:none;color:var(--paper);padding:7px 13px;font:13px var(--font-d);letter-spacing:.08em}
+  nav button:hover{text-decoration:underline}
+  nav button[aria-selected="true"]{background:var(--paper);color:var(--ink)}
+  @media (max-width:520px){nav{width:100%}nav button{flex:1;padding:7px 2px}}
+  section.tab{display:none}
+  section.tab.on{display:block}
+
+  button{font:13px var(--font-d);color:var(--paper);background:var(--ink);border:1px solid var(--paper);border-radius:0;padding:9px 14px;cursor:pointer;letter-spacing:.05em}
+  button:hover:not(:disabled){background:var(--paper);color:var(--ink)}
+  button:disabled{border-style:dotted;cursor:default;text-decoration:line-through}
+  button.primary{background:var(--paper);color:var(--ink)}
+  button.primary:hover:not(:disabled){background:var(--ink);color:var(--paper)}
+  button.quiet{border-color:transparent}
+  button.danger{border-style:dashed}
+
+  .hero{background:var(--ink);border:1px solid var(--paper);padding:24px;display:flex;gap:24px;align-items:center;flex-wrap:wrap}
+  .power{width:96px;height:96px;border-radius:50%;padding:0;flex:none;display:grid;place-items:center;background:var(--ink);border:1px dashed var(--paper);color:var(--paper)}
+  .power:hover:not(:disabled){background:var(--dots);color:var(--paper)}
+  .power svg{width:38px;height:38px}
+  .hero[data-s="ok"] .power{background:var(--paper);color:var(--ink);border-style:solid}
+  .hero[data-s="warn"] .power{background:var(--dots);border-style:solid}
+  .hero[data-s="bad"] .power{border:3px double var(--paper)}
+  .hero[data-s="busy"] .power{animation:blink 1.4s steps(2) infinite}
+  @keyframes blink{50%{background:var(--dots)}}
+  @media (prefers-reduced-motion:reduce){.hero[data-s="busy"] .power{animation:none}}
+  .power.ring{cursor:default}
+  .hero-text{flex:1;min-width:220px}
+  .hero-text h2{margin:0;font:400 22px/1.2 var(--font-d);letter-spacing:.02em}
+  .hero-text p{margin:8px 0 0;font-style:italic}
+  .hero-act{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+  .errline{font-size:14px;margin-top:10px;font-family:var(--font-d)}
+  .errline::before{content:"✕ "}
+  .errline:empty{display:none}
+
+  .banner{padding:12px 16px;margin-bottom:14px;border:1px dashed var(--paper);background:var(--ink)}
+  .banner.bad{border:3px double var(--paper)}
+
+  .block{margin-top:20px;background:var(--ink);padding:4px 0}
+  .top{background:var(--ink)}
+  .block>h3{display:inline-block;margin:0 0 10px;padding:2px 8px;font:400 13px/1.3 var(--font-d);letter-spacing:.18em;background:var(--paper);color:var(--ink)}
+  .block>.lead{margin:0 0 12px;font-size:14px;font-style:italic;background:var(--ink)}
+  .panel{background:var(--ink);border:1px solid var(--paper);padding:16px}
+
+  .tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+  .tile{background:var(--ink);border:1px dotted var(--paper);padding:11px 13px;min-width:0}
+  .tile.ok{border-style:solid}
+  .tile.bad{border:3px double var(--paper)}
+  .tile b{display:block;font-weight:600;overflow-wrap:anywhere}
+  .tile span{font:12px var(--font-d)}
+  .tile.ok span::before{content:"● "} .tile.bad span::before{content:"✕ "}
+  .after{display:flex;gap:12px;align-items:center;margin-top:12px;flex-wrap:wrap;font:12px var(--font-d)}
+  .after span{background:var(--ink);padding:0 4px}
+
+  .bar{height:8px;border:1px solid var(--paper);background:var(--ink);margin:12px 0}
+  .bar>div{height:100%;background:var(--dots);transition:width .4s steps(8)}
+  .res{display:flex;gap:10px;align-items:center;padding:7px 0;border-top:1px dotted var(--paper);font-size:14px}
+  .res:first-child{border-top:0}
+  .res .n{flex:1;min-width:0}
+  .res small{display:block;font-style:italic}
+  .res .score{font:12px var(--font-d)}
+  .dot{width:9px;height:9px;border:1px solid var(--paper);flex:none}
+  .dot.ok{background:var(--paper)} .dot.warn{background:var(--dots)} .dot.bad{border-radius:50%}
+  details>summary{cursor:pointer;font:13px var(--font-d);padding:4px 6px;background:var(--ink);display:inline-block}
+  details>summary:hover{text-decoration:underline}
+
+  .set{display:flex;gap:14px;align-items:center;justify-content:space-between;padding:13px 0;border-top:1px dotted var(--paper)}
+  .set:first-child{border-top:0}
+  .set .t{min-width:0}
+  .set .t small{display:block;font-size:13px;margin-top:2px;font-style:italic}
+  .sw{position:relative;flex:none;width:44px;height:22px}
+  .sw input{position:absolute;inset:0;opacity:0;margin:0;cursor:pointer;z-index:1}
+  .sw i{position:absolute;inset:0;background:var(--ink);border:1px solid var(--paper)}
+  .sw i::after{content:"";position:absolute;top:3px;left:3px;width:14px;height:14px;background:var(--dots);transition:transform .12s steps(3)}
+  .sw input:checked+i{background:var(--paper)}
+  .sw input:checked+i::after{transform:translateX(22px);background:var(--ink)}
+  .sw input:focus-visible+i{outline:1px dashed var(--paper);outline-offset:3px}
+  .chips{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+  .chip{position:relative}
+  .chip input{position:absolute;inset:0;opacity:0;margin:0;cursor:pointer}
+  .chip span{display:block;padding:6px 12px;border:1px dotted var(--paper);background:var(--ink);font:13px var(--font-d)}
+  .chip input:checked+span{background:var(--paper);color:var(--ink);border-style:solid}
+  .chip input:focus-visible+span{outline:1px dashed var(--paper);outline-offset:3px}
+
+  .kv{display:flex;gap:12px;align-items:baseline;padding:4px 0;flex-wrap:wrap}
+  .kv span{font:13px var(--font-d);min-width:70px}
+  .kv code{word-break:break-all}
+  .tile.n b{font:400 22px/1.1 var(--font-d)}
+  select{font:13px var(--font-d);color:var(--paper);background:var(--ink);border:1px solid var(--paper);border-radius:0;padding:9px 10px;max-width:100%;min-width:200px}
+  .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+  .hint{font-size:14px}
+  p.hint,span.hint{font-style:italic}
+  span.hint{background:var(--ink);padding:0 4px}
+  code{background:var(--paper);color:var(--ink);padding:0 5px;font:12px var(--font-d)}
+  pre{margin:0;max-height:260px;overflow:auto;background:var(--ink);border:1px solid var(--paper);padding:10px;font:12px/1.55 Consolas,monospace;color:var(--paper);white-space:pre-wrap;word-break:break-word}
+
+  #toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);max-width:min(420px,calc(100% - 32px));padding:10px 16px;
+    background:var(--paper);color:var(--ink);font:13px var(--font-d);z-index:9;display:none;border:1px solid var(--ink);outline:1px solid var(--paper)}
+</style>
+</head>
+<body>
+<div id="bg" data-v="eye"></div>
+<div class="wrap">
+  <div class="top">
+    <div class="brand"><h1>Gust</h1><span id="ver"></span></div>
+    <nav role="tablist" aria-label="Разделы">
+      <button role="tab" data-tab="home" aria-selected="true">Главная</button>
+      <button role="tab" data-tab="discord" aria-selected="false">Discord</button>
+      <button role="tab" data-tab="tg" aria-selected="false">Telegram</button>
+      <button role="tab" data-tab="settings" aria-selected="false">Настройки</button>
+      <button role="tab" data-tab="adv" aria-selected="false">Прочее</button>
+    </nav>
+  </div>
+
+  <div id="banners"></div>
+
+  <!-- ГЛАВНАЯ -->
+  <section class="tab on" id="tab-home">
+    <div class="hero" id="hero" data-s="idle">
+      <button class="power" id="btnToggle" aria-label="Включить обход" title="Включить обход">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M12 3v8"/><path d="M6.3 6.8a8 8 0 1 0 11.4 0"/></svg>
+      </button>
+      <div class="hero-text">
+        <h2 id="htitle">…</h2>
+        <p id="hsub"></p>
+        <div class="hero-act" id="heroAct">
+          <button class="primary" id="btnInstall" style="display:none">Загрузить компоненты</button>
+          <button id="btnTune">Подобрать заново</button>
+          <button id="btnTuneCancel" class="danger" style="display:none">Остановить</button>
+        </div>
+        <div class="errline" id="engErr"></div>
+        <div class="errline" id="setupErr"></div>
+      </div>
+    </div>
+
+    <div class="block" id="setupHelp" style="display:none">
+      <div class="panel hint">
+        <p style="margin:0 0 8px">Требуется сборка zapret (<code>Flowseal/zapret-discord-youtube</code>), загружается один раз.</p>
+        <p style="margin:0">Если GitHub недоступен, распакуйте архив вручную в <code id="zapPath"></code> и перезапустите программу.</p>
+      </div>
+    </div>
+
+    <div class="block" id="tuneBlock" style="display:none">
+      <h3>Подбор стратегии</h3>
+      <div class="panel">
+        <div id="tuneMsg"></div>
+        <div class="bar"><div id="tuneBar" style="width:0%"></div></div>
+        <details id="tuneDet"><summary>Результаты</summary><div id="tuneRes"></div></details>
+      </div>
+    </div>
+
+    <div class="block" id="svcBlock">
+      <h3>Доступность</h3>
+      <div class="tiles" id="targets"></div>
+      <div class="after">
+        <button id="btnCheck">Проверить</button>
+        <span id="checkAt"></span>
+      </div>
+    </div>
+  </section>
+
+  <!-- НАСТРОЙКИ -->
+  <section class="tab" id="tab-settings">
+    <div class="block" style="margin-top:0">
+      <h3>Запуск</h3>
+      <div class="panel">
+        <div class="set"><div class="t">Автозапуск с Windows<small>Без запроса прав при входе.</small></div>
+          <label class="sw"><input type="checkbox" id="oAuto"><i></i></label></div>
+        <div class="set"><div class="t">Язык</div>
+          <select id="oLang" aria-label="Язык" style="min-width:160px"><option value="auto">Авто (как в Windows)</option><option value="ru">Русский</option><option value="en">English</option></select></div>
+        <div class="set"><div class="t">Включать обход при запуске</div>
+          <label class="sw"><input type="checkbox" id="oBoot"><i></i></label></div>
+        <div class="set"><div class="t">Автоподбор при сбое<small>Проверка каждые несколько минут.</small></div>
+          <label class="sw"><input type="checkbox" id="oRetune"><i></i></label></div>
+      </div>
+    </div>
+
+    <div class="block">
+      <h3>Проверяемые сервисы</h3>
+      <div class="panel">
+        <div class="chips">
+          <label class="chip"><input type="checkbox" data-g="discord"><span>Discord</span></label>
+          <label class="chip"><input type="checkbox" data-g="youtube"><span>YouTube</span></label>
+        </div>
+        <p class="hint" style="margin:10px 0 0">Остальные сервисы — во вкладке «Прочее».</p>
+      </div>
+    </div>
+
+    <div class="block">
+      <h3>Стратегии</h3>
+      <div class="panel">
+        <div class="set"><div class="t">Расширенный набор<small>Собственные стратегии GU-xx после стандартных.</small></div>
+          <label class="sw"><input type="checkbox" id="oExtra"><i></i></label></div>
+        <div class="set"><div class="t">Игровой фильтр<small>Порты 1024–65535. Только при необходимости.</small></div>
+          <label class="sw"><input type="checkbox" id="oGame"><i></i></label></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- DISCORD -->
+  <section class="tab" id="tab-discord">
+    <div class="hero" id="dcHero" data-s="idle">
+      <div class="power ring" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 5.6c1.3-.5 2.6-.7 4-.7s2.7.2 4 .7l.7-1.2c1.4.4 2.6 1 3.7 1.8 1.6 2.6 2.4 5.6 2.3 8.9-1.4 1.3-3 2.2-4.8 2.8l-1.1-1.9"/><path d="M8 5.6l-.7-1.2C5.9 4.8 4.7 5.4 3.6 6.2 2 8.8 1.2 11.8 1.3 15.1c1.4 1.3 3 2.2 4.8 2.8l1.1-1.9"/><path d="M6.6 15.8c3.5 1.6 7.3 1.6 10.8 0"/><path d="M8.3 11.4l2.2.6M15.7 11.4l-2.2.6"/></svg>
+      </div>
+      <div class="hero-text">
+        <h2 id="dcTitle">…</h2>
+        <p id="dcSub"></p>
+        <div class="hero-act">
+          <button class="primary" id="btnDcOn" style="display:none">Включить обход</button>
+          <button id="btnDcCheck">Проверить</button>
+          <button id="btnDcTune">Подобрать для Discord</button>
+          <button class="danger" id="btnDcCancel" style="display:none">Остановить</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="block">
+      <h3>Состояние</h3>
+      <div class="tiles" id="dcTargets"></div>
+      <p class="hint" style="margin:10px 0 0">Подбор для Discord может отключить YouTube.</p>
+    </div>
+
+    <div class="block">
+      <h3>Голос не подключается</h3>
+      <p class="lead">Голос не проверяется автоматически. При зависании на «Подключение к RTC» смените стратегию и перезайдите в канал.</p>
+      <div class="panel row">
+        <button class="primary" id="btnDcNext">Следующая стратегия</button>
+        <span class="hint" id="dcStrat"></span>
+      </div>
+    </div>
+
+    <div class="block">
+      <h3>Discord и VPN</h3>
+      <p class="lead">Для VPN в режиме прокси (Happ и др.): Discord идёт через обход, остальное — через VPN.</p>
+      <div class="panel">
+        <div class="set"><div class="t">Discord в обход VPN<small>Discord будет перезапущен.</small></div>
+          <label class="sw"><input type="checkbox" id="oDcDirect"><i></i></label></div>
+      </div>
+    </div>
+
+    <div class="block">
+      <h3>Discord не подключается</h3>
+      <p class="lead">Перезапуск через обход.</p>
+      <div class="panel row">
+        <button id="btnDcRestart">Перезапустить Discord</button>
+        <span class="hint" id="dcRun"></span>
+      </div>
+    </div>
+
+    <div class="block">
+      <details>
+        <summary>Не помогло</summary>
+        <div class="panel hint" style="margin-top:8px">
+          <p style="margin:0 0 8px">Отключите VPN и прокси в Discord и системе.</p>
+          <p style="margin:0 0 8px">Смените регион голосового канала на европейский.</p>
+          <p style="margin:0">Добавьте <code id="dcZap"></code> в исключения антивируса.</p>
+        </div>
+      </details>
+    </div>
+  </section>
+
+  <!-- TELEGRAM -->
+  <section class="tab" id="tab-tg">
+    <div class="hero" id="tgHero" data-s="idle">
+      <button class="power" id="btnTgToggle" aria-label="Включить прокси Telegram" title="Включить прокси Telegram">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M12 3v8"/><path d="M6.3 6.8a8 8 0 1 0 11.4 0"/></svg>
+      </button>
+      <div class="hero-text">
+        <h2 id="tgTitle">…</h2>
+        <p id="tgSub"></p>
+        <div class="hero-act">
+          <button class="primary" id="btnTgOpen">Подключить Telegram</button>
+        </div>
+        <div class="errline" id="tgErr"></div>
+      </div>
+    </div>
+
+    <div class="block">
+      <h3>Принцип работы</h3>
+      <div class="panel hint">
+        <p style="margin:0 0 8px">Telegram ограничен по IP, поэтому трафик идёт через встроенный MTProto-прокси и WebSocket. Шифрование сохраняется.</p>
+        <p style="margin:0">Нажмите «Подключить Telegram» и подтвердите в Telegram Desktop.</p>
+      </div>
+    </div>
+
+    <div class="block" id="tgStatsBlock" style="display:none">
+      <h3>Соединения</h3>
+      <div class="tiles" id="tgStats"></div>
+      <p class="hint" id="tgDirect" style="margin:10px 0 0"></p>
+    </div>
+
+    <div class="block">
+      <details>
+        <summary>Ручная настройка</summary>
+        <div class="panel" style="margin-top:8px">
+          <p class="hint" style="margin:0 0 10px">Telegram → Настройки → Продвинутые → Тип соединения → Прокси → Добавить прокси → MTProto.</p>
+          <div class="kv"><span>Сервер</span><code>127.0.0.1</code></div>
+          <div class="kv"><span>Порт</span><code id="tgPort"></code></div>
+          <div class="kv"><span>Секрет</span><code id="tgSecret"></code></div>
+          <div class="row" style="margin-top:12px"><button id="btnTgCopy">Скопировать ссылку</button></div>
+        </div>
+      </details>
+    </div>
+
+  </section>
+
+  <!-- ДОПОЛНИТЕЛЬНО -->
+  <section class="tab" id="tab-adv">
+    <div class="block" style="margin-top:0">
+      <h3>Дополнительные сервисы</h3>
+      <div class="panel">
+        <div class="chips" id="svcExtra"></div>
+        <p class="hint" style="margin:10px 0 0">Отмеченные сервисы добавляются в обход и в проверку. Каждый увеличивает время подбора.</p>
+      </div>
+    </div>
+    <div class="block">
+      <h3>Стратегия вручную</h3>
+      <div class="panel"><div class="row">
+        <select id="strat" aria-label="Стратегия"></select>
+        <button id="btnApply">Применить</button>
+      </div></div>
+    </div>
+
+    <div class="block">
+      <h3>Журнал</h3>
+      <pre id="log"></pre>
+    </div>
+
+    <div class="block">
+      <h3>О программе</h3>
+      <p class="hint" style="margin:0">На основе <code>zapret</code> (bol-van), <code>zapret-discord-youtube</code> и <code>tg-ws-proxy</code> (Flowseal, MIT).</p>
+    </div>
+
+    <div class="block">
+      <h3>Выход</h3>
+      <div class="panel row">
+        <button class="danger" id="btnQuit">Выйти</button>
+        <span class="hint">Обход будет отключён.</span>
+      </div>
+    </div>
+  </section>
+</div>
+<div id="toast" role="status"></div>
+
+<script>
+const LANG = "{{LANG}}";
+if (LANG === "en") (() => {
+  document.documentElement.lang = "en";
+  const D = {
+    "Главная": "Home", "Настройки": "Settings", "Прочее": "More", "Разделы": "Sections",
+    "Загрузить компоненты": "Download components", "Подобрать заново": "Re-tune", "Подобрать": "Auto-tune", "Остановить": "Stop",
+    "Подбор стратегии": "Strategy tuning", "Результаты": "Results", "Доступность": "Availability", "Проверить": "Check",
+    "Требуется сборка zapret (": "Requires the zapret build (", "), загружается один раз.": "), downloaded once.",
+    "Если GitHub недоступен, распакуйте архив вручную в": "If GitHub is unreachable, unpack the archive manually into", "и перезапустите программу.": "and restart the app.",
+    "Запуск": "Startup", "Автозапуск с Windows": "Start with Windows", "Без запроса прав при входе.": "No elevation prompt at sign-in.",
+    "Включать обход при запуске": "Enable bypass on launch", "Автоподбор при сбое": "Re-tune on failure", "Проверка каждые несколько минут.": "Checked every few minutes.",
+    "Язык": "Language", "Авто (как в Windows)": "Auto (Windows)",
+    "Проверяемые сервисы": "Checked services", "Остальные сервисы — во вкладке «Прочее».": "More services are in the “More” tab.",
+    "Стратегии": "Strategies", "Расширенный набор": "Extended set", "Собственные стратегии GU-xx после стандартных.": "Own GU-xx strategies after the standard ones.",
+    "Игровой фильтр": "Game filter", "Порты 1024–65535. Только при необходимости.": "Ports 1024–65535. Only if needed.",
+    "Включить обход": "Enable bypass", "Отключить обход": "Disable bypass", "Подобрать для Discord": "Tune for Discord", "Состояние": "Status",
+    "Подбор для Discord может отключить YouTube.": "Tuning for Discord may break YouTube.",
+    "Голос не подключается": "Voice won't connect",
+    "Голос не проверяется автоматически. При зависании на «Подключение к RTC» смените стратегию и перезайдите в канал.": "Voice isn't checked automatically. If stuck on “RTC Connecting”, switch strategy and rejoin the channel.",
+    "Следующая стратегия": "Next strategy", "Discord и VPN": "Discord and VPN",
+    "Для VPN в режиме прокси (Happ и др.): Discord идёт через обход, остальное — через VPN.": "For VPN in proxy mode (Happ etc.): Discord uses the bypass, everything else uses the VPN.",
+    "Discord в обход VPN": "Discord outside VPN", "Discord будет перезапущен.": "Discord will be restarted.",
+    "Discord не подключается": "Discord won't connect", "Перезапуск через обход.": "Restart through the bypass.", "Перезапустить Discord": "Restart Discord",
+    "Не помогло": "Didn't help", "Отключите VPN и прокси в Discord и системе.": "Disable VPN and proxy in Discord and the system.",
+    "Смените регион голосового канала на европейский.": "Set the voice channel region to a European one.", "Добавьте": "Add", "в исключения антивируса.": "to antivirus exclusions.",
+    "Discord запущен.": "Discord is running.", "Discord сейчас не запущен — кнопка просто откроет его.": "Discord isn't running — the button will just open it.",
+    "Подключить Telegram": "Connect Telegram", "Принцип работы": "How it works",
+    "Telegram ограничен по IP, поэтому трафик идёт через встроенный MTProto-прокси и WebSocket. Шифрование сохраняется.": "Telegram is restricted by IP, so traffic goes through the built-in MTProto proxy over WebSocket. Encryption is preserved.",
+    "Нажмите «Подключить Telegram» и подтвердите в Telegram Desktop.": "Click “Connect Telegram” and confirm in Telegram Desktop.",
+    "Соединения": "Connections", "Ручная настройка": "Manual setup",
+    "Telegram → Настройки → Продвинутые → Тип соединения → Прокси → Добавить прокси → MTProto.": "Telegram → Settings → Advanced → Connection type → Proxy → Add proxy → MTProto.",
+    "Сервер": "Server", "Порт": "Port", "Секрет": "Secret", "Скопировать ссылку": "Copy link",
+    "Дополнительные сервисы": "Additional services", "Telegram (сайт)": "Telegram (web)",
+    "Отмеченные сервисы добавляются в обход и в проверку. Каждый увеличивает время подбора.": "Selected services are added to the bypass and checks. Each one makes tuning longer.",
+    "Стратегия вручную": "Manual strategy", "Стратегия": "Strategy", "Применить": "Apply", "Журнал": "Log", "О программе": "About",
+    "На основе": "Based on", "и": "and", "Выход": "Quit", "Выйти": "Quit", "Обход будет отключён.": "The bypass will be disabled.",
+    "Нет связи, повтор…": "No connection, retrying…", "Нет связи": "No connection", "Программа не отвечает.": "The app isn't responding.",
+    "Требуются компоненты": "Components required", "Загрузите сборку zapret.": "Download the zapret build.", "Загрузите их на главной.": "Download them on the Home tab.",
+    "Это займёт несколько минут.": "This will take a few minutes.", "Обход включён": "Bypass enabled", "Проверка…": "Checking…",
+    "Обход активен": "Bypass active", "Частичный доступ": "Partial access", "Обход отключён": "Bypass disabled", "Обход отключён.": "Bypass disabled.",
+    "Загрузка…": "Downloading…", "Подбор для Discord": "Tuning for Discord", "Не проверено": "Not checked",
+    "Discord доступен": "Discord is reachable", "Без обхода.": "Without bypass.", "Discord недоступен": "Discord is unreachable", "Запустите подбор.": "Run tuning.",
+    "Прокси отключён": "Proxy disabled", "Закройте старый TG WS Proxy.": "Close the old TG WS Proxy.", "Устаревшие настройки": "Outdated settings",
+    "Подключите Telegram повторно.": "Connect Telegram again.", "Прокси активен": "Proxy active", "Нет активных соединений.": "No active connections.",
+    "Подключите Telegram.": "Connect Telegram.", "Отключить прокси": "Disable proxy", "Включить прокси": "Enable proxy", "Включить прокси Telegram": "Enable Telegram proxy",
+    "WebSocket работает.": "WebSocket is working.", "открыто сейчас": "open now", "трафика за сеанс": "traffic this session",
+    "через WebSocket": "via WebSocket", "напрямую": "direct", "не удалось": "failed",
+    "Стратегия изменена. Перезайдите в канал.": "Strategy changed. Rejoin the channel.", "Перезапуск Discord…": "Restarting Discord…",
+    "Перезапускаю Discord мимо прокси VPN…": "Restarting Discord outside the VPN proxy…", "Перезапускаю Discord обычным способом…": "Restarting Discord normally…",
+    "Подтвердите подключение в Telegram": "Confirm the connection in Telegram", "Ссылка скопирована": "Link copied", "Скопируйте ссылку:": "Copy the link:",
+    "Выйти и отключить обход?": "Quit and disable the bypass?", "Программа закрыта.": "The app is closed.", "Сервисы не выбраны.": "No services selected.",
+    "ещё не проверено": "not checked yet", "Сайт и вход": "Website and login", "Сообщения": "Messages", "Файлы и аватарки": "Files and avatars",
+    "Картинки и превью": "Images and previews", "Обновления": "Updates",
+    "Нет прав администратора.": "No administrator rights.",
+    "Драйвер WinDivert не загрузится. Закройте программу и запустите снова, согласившись на запрос Windows.": "The WinDivert driver won't load. Close the app and start it again, accepting the Windows prompt.",
+    "Это не Windows: обход здесь не заработает, интерфейс открыт для отладки.": "Not Windows: the bypass won't work here, the UI is open for debugging.",
+    "Подготовка…": "Preparing…", "Проверяю, что блокируется без обхода…": "Checking what is blocked without the bypass…",
+    "подбор отменён": "tuning cancelled", "сборка zapret не установлена": "the zapret build is not installed",
+    "не выбрано ни одного сервиса для проверки": "no services selected for checking",
+    "нет интернета (ya.ru не открывается) — подбор невозможен": "no internet (ya.ru unreachable) — tuning impossible",
+    "всё и так доступно без обхода; включил стратегию по умолчанию на случай голоса/UDP": "everything is reachable without the bypass; default strategy enabled for voice/UDP",
+    "ни одна стратегия не помогла. Отключите VPN/другие обходчики, проверьте антивирус и DNS (лучше 1.1.1.1 или 8.8.8.8)": "no strategy helped. Disable VPN/other bypass tools, check antivirus and DNS (1.1.1.1 or 8.8.8.8 recommended)",
+    "Ищу последний релиз на GitHub…": "Looking for the latest release on GitHub…", "Распаковываю…": "Unpacking…",
+    "Нет прав администратора для драйвера WinDivert.": "No administrator rights for the WinDivert driver.",
+    "Не найден файл из сборки zapret. Переустановите сборку.": "A zapret build file is missing. Reinstall the build.",
+    "идёт подбор — дождитесь конца": "tuning in progress — wait for it to finish", "идёт подбор — дождитесь конца или остановите его": "tuning in progress — wait or stop it",
+    "идёт подбор": "tuning in progress", "подбор уже идёт": "tuning already running", "уже скачивается": "already downloading", "нет такой стратегии": "no such strategy",
+    "переключаться не на что: стратегий меньше двух": "nothing to switch to: fewer than two strategies", "работает только в Windows": "Windows only",
+    "не нашёл последний релиз (GitHub недоступен?)": "latest release not found (GitHub unreachable?)", "в архиве нет файлов сборки zapret": "no zapret build files in the archive",
+  };
+  const P = [
+    [/^Недоступно: (.*)$/, "Unavailable: $1"], [/^Соединений: (.*)$/, "Connections: $1"],
+    [/^Проверено в (.*?)\. Нет интернета\.$/, "Checked at $1. No internet."], [/^Проверено в (.*)$/, "Checked at $1"],
+    [/^Текущая: «(.*)»$/, "Current: “$1”"], [/^Проверка «(.*)» \((\d+) из (\d+)\)$/, "Testing “$1” ($2 of $3)"],
+    [/^Проверяю «(.*)» \((\d+) из (\d+)\)…$/, "Testing “$1” ($2 of $3)…"], [/^(\d+) из (\d+)$/, "$1 of $2"],
+    [/^открывается, (\d+) мс$/, "reachable, $1 ms"], [/^работает, (\d+) мс$/, "working, $1 ms"], [/^не открывается(.*)$/, "unreachable$1"],
+    [/^([\d.]+) КБ$/, "$1 KB"], [/^([\d.]+) МБ$/, "$1 MB"],
+    [/^Нет ответа от Telegram \((\d+)\)\. См\. журнал\.$/, "No response from Telegram ($1). See the log."],
+    [/^WebSocket недоступен \((.*)\), используется TCP\.$/, "WebSocket unavailable ($1), using TCP."],
+    [/^выбрана «(.*)»: открывается (\d+) из (\d+)$/, "selected “$1”: $2 of $3 reachable"], [/^не открылись: (.*)$/, "failed: $1"],
+    [/^Скачиваю (.*): (\d+)%$/, "Downloading $1: $2%"], [/^Скачиваю (.*): (\d+) КБ$/, "Downloading $1: $2 KB"], [/^Готово: (.*)$/, "Done: $1"],
+    [/^не запускается драйвер: (.*)$/, "driver won't start: $1"], [/^лучшая стратегия не стартовала: (.*)$/, "best strategy failed to start: $1"],
+    [/^winws постоянно падает: (.*)$/, "winws keeps crashing: $1"], [/^порт (\d+) занят другой программой$/, "port $1 is used by another program"],
+    [/^порт (\d+) занят старым TG WS Proxy.*$/, "port $1 is used by the old TG WS Proxy. Close it from the tray: it's no longer needed"],
+    [/^Драйвер WinDivert заблокирован.*$/, "The WinDivert driver is blocked (antivirus, Secure Boot or Memory Integrity). Add the Gust folder to antivirus exclusions."],
+    [/^не нашёл Discord.*$/, "Discord not found: it isn't running and isn't in the standard folders. Open Discord and try again."],
+    [/^Discord не закрылся.*$/, "Discord didn't close. Quit it from the tray and open it again."],
+  ];
+  const tr = t => {
+    const k = t.trim();
+    if (!k || !/[А-Яа-яЁё]/.test(k)) return t;
+    let r = D[k];
+    if (r === undefined) for (const [re, rp] of P) if (re.test(k)) { r = k.replace(re, rp); break; }
+    return r === undefined ? t : t.replace(k, r);
+  };
+  const SKIP = {SCRIPT: 1, STYLE: 1, PRE: 1};
+  const walk = n => {
+    if (n.nodeType === 3) { const v = tr(n.nodeValue); if (v !== n.nodeValue) n.nodeValue = v; return; }
+    if (n.nodeType !== 1 || SKIP[n.tagName]) return;
+    for (const a of ["title", "aria-label", "placeholder"]) if (n.hasAttribute(a)) { const v = tr(n.getAttribute(a)); if (v !== n.getAttribute(a)) n.setAttribute(a, v); }
+    n.childNodes.forEach(walk);
+  };
+  const go = () => {
+    walk(document.body);
+    new MutationObserver(ms => ms.forEach(m => {
+      if (m.type === "characterData") walk(m.target);
+      else if (m.type === "attributes") walk(m.target);
+      else m.addedNodes.forEach(walk);
+    })).observe(document.body, {subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ["title", "aria-label"]});
+  };
+  if (document.body) go(); else document.addEventListener("DOMContentLoaded", go);
+  const c = window.confirm, p = window.prompt;
+  window.confirm = m => c(tr(m));
+  window.prompt = (m, d) => p(tr(m), d);
+})();
+const TOKEN = "{{TOKEN}}";
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+let S = null, lastStrat = "", pollFails = 0;
+
+let toastT = null;
+function toast(msg) {
+  const t = $("toast");
+  t.textContent = msg; t.style.display = "block";
+  clearTimeout(toastT); toastT = setTimeout(() => t.style.display = "none", 5000);
+}
+
+async function api(path, body) {
+  try {
+    const r = await fetch(path, {method: "POST", headers: {"X-GU-Token": TOKEN, "Content-Type": "application/json"}, body: JSON.stringify(body || {})});
+    const j = await r.json();
+    if (!j.ok && j.error) toast(j.error);
+    return j;
+  } catch (e) { toast("Нет связи, повтор…"); }
+  finally { tick(); }
+}
+
+async function tick() {
+  // отдельный таймаут на запрос: во время подбора машина занята, одиночный опрос может зависнуть
+  const ctl = new AbortController();
+  const to = setTimeout(() => ctl.abort(), 6000);
+  try {
+    const r = await fetch("/api/state", {headers: {"X-GU-Token": TOKEN}, signal: ctl.signal});
+    // 403 — это уже другая копия программы (после перезапуска сменился токен): берём свежую страницу
+    if (r.status === 403) { location.reload(); return; }
+    if (!r.ok) throw new Error("http " + r.status);
+    S = await r.json();
+    pollFails = 0;
+    render();
+  } catch (e) {
+    // один пропущенный опрос во время подбора — не повод кричать «нет связи»;
+    // экран меняем только после нескольких неудач подряд
+    if (++pollFails >= 4) setHero("bad", "Нет связи", "Программа не отвечает.");
+  } finally {
+    clearTimeout(to);
+  }
+}
+
+function setHero(state, title, sub) {
+  $("hero").dataset.s = state;
+  $("htitle").textContent = title;
+  $("hsub").textContent = sub || "";
+}
+
+function render() {
+  const s = S, e = s.engine, t = s.tune;
+  $("ver").textContent = "v" + s.version;
+
+  let ban = "";
+  if (!s.admin) ban += '<div class="banner bad"><b>Нет прав администратора.</b> Драйвер WinDivert не загрузится. Закройте программу и запустите снова, согласившись на запрос Windows.</div>';
+  if (s.os !== "windows") ban += '<div class="banner warn">Это не Windows: обход здесь не заработает, интерфейс открыт для отладки.</div>';
+  $("banners").innerHTML = ban;
+
+  // проверки по именам
+  const byName = {};
+  (s.checks.results || []).forEach(r => byName[r.name] = r);
+  const targets = s.targets || [];
+  const checked = targets.filter(x => byName[x.name]);
+  const failing = checked.filter(x => !byName[x.name].ok).map(x => x.name);
+
+  // главный статус
+  const run = e.running;
+  const ready = s.setup_ready;
+  if (!ready) {
+    setHero("idle", "Требуются компоненты", "Загрузите сборку zapret.");
+  } else if (t.running) {
+    setHero("busy", "Подбор стратегии", t.msg || "Это займёт несколько минут.");
+  } else if (run) {
+    if (!checked.length) setHero("ok", "Обход включён", "Проверка…");
+    else if (!failing.length) setHero("ok", "Обход активен", e.strategy);
+    else setHero("warn", "Частичный доступ", "Недоступно: " + failing.join(", "));
+  } else {
+    setHero("idle", "Обход отключён", "");
+  }
+  const power = $("btnToggle");
+  const label = run ? "Отключить обход" : "Включить обход";
+  power.setAttribute("aria-label", label); power.title = label;
+  power.disabled = t.running || !ready;
+  $("engErr").textContent = (!run && e.last_err) ? e.last_err : "";
+
+  $("btnInstall").style.display = ready ? "none" : "";
+  $("btnInstall").disabled = s.setup.busy;
+  $("btnInstall").textContent = s.setup.busy ? (s.setup.msg || "Загрузка…") : "Загрузить компоненты";
+  $("setupHelp").style.display = ready ? "none" : "";
+  $("zapPath").textContent = s.zap_dir || "";
+  $("setupErr").textContent = s.setup.err || "";
+  $("btnTune").style.display = ready && !t.running ? "" : "none";
+  $("btnTune").textContent = run || (t.results && t.results.length) ? "Подобрать заново" : "Подобрать";
+  $("btnTuneCancel").style.display = t.running ? "" : "none";
+
+  // подбор
+  const showTune = t.running || (t.results && t.results.length);
+  $("tuneBlock").style.display = showTune ? "" : "none";
+  $("tuneMsg").textContent = t.running ? (t.current ? "Проверка «" + t.current + "» (" + t.idx + " из " + t.total + ")" : (t.msg || "")) : (t.msg || "");
+  $("tuneBar").style.width = (t.total ? Math.round(t.idx / t.total * 100) : 0) + "%";
+  $("tuneBar").parentElement.style.display = t.running ? "" : "none";
+  if (t.running && !$("tuneDet").dataset.touched) $("tuneDet").open = true;
+  $("tuneRes").innerHTML = (t.results || []).slice().reverse().map(r =>
+    `<div class="res"><span class="dot ${r.passed === r.total ? "ok" : r.passed ? "warn" : "bad"}"></span>
+     <div class="n">${esc(r.strategy)}${r.note ? "<small>" + esc(r.note) + "</small>" : ""}</div><div class="score">${r.passed} из ${r.total}</div></div>`).join("");
+
+  // сервисы
+  $("svcBlock").style.display = ready ? "" : "none";
+  $("targets").innerHTML = targets.map(x => {
+    const r = byName[x.name];
+    const cls = !r ? "" : r.ok ? "ok" : "bad";
+    const info = !r ? "ещё не проверено" : r.ok ? "открывается, " + r.ms + " мс" : "не открывается" + (r.err ? ": " + esc(r.err) : "");
+    return `<div class="tile ${cls}" title="${esc(x.url)}"><b>${esc(x.name)}</b><span>${info}</span></div>`;
+  }).join("") || '<p class="hint">Сервисы не выбраны.</p>';
+  $("btnCheck").disabled = s.checks.running;
+  $("btnCheck").textContent = s.checks.running ? "Проверка…" : "Проверить";
+  $("checkAt").textContent = s.checks.at ? "Проверено в " + new Date(s.checks.at * 1000).toLocaleTimeString() + (s.checks.internet ? "" : ". Нет интернета.") : "";
+
+  // стратегия
+  const key = JSON.stringify(s.strategies) + "|" + s.settings.selected;
+  if (key !== lastStrat && document.activeElement !== $("strat")) {
+    lastStrat = key;
+    $("strat").innerHTML = s.strategies.map(n => `<option ${n === s.settings.selected ? "selected" : ""}>${esc(n)}</option>`).join("");
+  }
+  $("btnApply").disabled = t.running || !s.strategies.length;
+
+  // настройки
+  const set = (id, v) => { if (document.activeElement !== $(id)) $(id).checked = !!v; };
+  set("oAuto", s.autostart); set("oBoot", s.settings.auto_start_bypass);
+  set("oRetune", s.settings.auto_retune); set("oGame", s.settings.game_filter); set("oExtra", s.settings.extra_strategies);
+  const ex = $("svcExtra"), list = (s.services || []).filter(v => v.id !== "discord" && v.id !== "youtube");
+  if (ex.dataset.n !== String(list.length)) {
+    ex.dataset.n = list.length;
+    ex.innerHTML = list.map(v => `<label class="chip"><input type="checkbox" data-g="${esc(v.id)}"><span>${esc(v.name)}</span></label>`).join("");
+  }
+  if (document.activeElement !== $("oLang")) $("oLang").value = s.settings.lang || "auto";
+  document.querySelectorAll("[data-g]").forEach(c => { if (document.activeElement !== c) c.checked = !!s.settings.groups[c.dataset.g]; });
+
+  // discord
+  const d = s.discord, dres = {}, dTune = t.running && t.scope === "discord";
+  (d.checks.results || []).forEach(r => dres[r.name] = r);
+  const dLabel = {"discord.com": "Сайт и вход", "gateway.discord.gg": "Сообщения", "cdn.discordapp.com": "Файлы и аватарки",
+    "media.discordapp.net": "Картинки и превью", "updates.discord.com": "Обновления"};
+  const dChecked = d.targets.filter(x => dres[x.name]), dBad = dChecked.filter(x => !dres[x.name].ok);
+  const dHero = (st_, ti, su) => { $("dcHero").dataset.s = st_; $("dcTitle").textContent = ti; $("dcSub").textContent = su; };
+  if (!ready) dHero("idle", "Требуются компоненты", "Загрузите их на главной.");
+  else if (dTune) dHero("busy", "Подбор для Discord", t.msg || "");
+  else if (t.running) dHero("busy", "Подбор стратегии", t.msg || "");
+  else if (d.checks.running && !dChecked.length) dHero("busy", "Проверка…", "");
+  else if (!dChecked.length) dHero("idle", "Не проверено", "");
+  else if (!dBad.length) dHero("ok", "Discord доступен", run ? e.strategy : "Без обхода.");
+  else if (dBad.length === dChecked.length) dHero("bad", "Discord недоступен", run ? "Запустите подбор." : "Обход отключён.");
+  else dHero("warn", "Частичный доступ", "Недоступно: " + dBad.map(x => { const l = dLabel[x.name] || x.name; return l[0].toLowerCase() + l.slice(1); }).join(", ") + ".");
+  $("btnDcOn").style.display = ready && !run && !t.running ? "" : "none";
+  $("btnDcCheck").disabled = d.checks.running || t.running;
+  $("btnDcCheck").textContent = d.checks.running ? "Проверка…" : "Проверить";
+  $("btnDcTune").style.display = ready && !t.running ? "" : "none";
+  $("btnDcCancel").style.display = t.running ? "" : "none";
+  $("dcTargets").innerHTML = d.targets.map(x => {
+    const r = dres[x.name], cls = !r ? "" : r.ok ? "ok" : "bad";
+    const info = !r ? "ещё не проверено" : r.ok ? "работает, " + r.ms + " мс" : "не открывается";
+    return `<div class="tile ${cls}" title="${esc(x.name)}"><b>${esc(dLabel[x.name] || x.name)}</b><span>${info}</span></div>`;
+  }).join("");
+  $("btnDcNext").disabled = t.running || !ready || s.strategies.length < 2;
+  $("dcStrat").textContent = run ? "Текущая: «" + e.strategy + "»" : "Обход отключён.";
+  $("btnDcRestart").disabled = s.os !== "windows";
+  $("dcRun").textContent = s.os !== "windows" ? "" : d.running ? "Discord запущен." : "Discord сейчас не запущен — кнопка просто откроет его.";
+  $("dcZap").textContent = s.zap_dir || "";
+  if (document.activeElement !== $("oDcDirect")) $("oDcDirect").checked = !!s.settings.discord_direct;
+
+  // telegram
+  const g = s.tg, st = g.stats || {}, now = Date.now() / 1000;
+  const badRecent = st.last_bad && now - st.last_bad < 120 && !(st.last_ok > st.last_bad);
+  const tgHero = (state, title, sub) => { $("tgHero").dataset.s = state; $("tgTitle").textContent = title; $("tgSub").textContent = sub; };
+  if (!g.running) tgHero(g.err ? "bad" : "idle", "Прокси отключён", g.old_proxy ? "Закройте старый TG WS Proxy." : "");
+  else if (badRecent) tgHero("warn", "Устаревшие настройки", "Подключите Telegram повторно.");
+  else if (st.active > 0) tgHero("ok", "Прокси активен", "Соединений: " + st.active);
+  else if (st.total > 0) tgHero("ok", "Прокси активен", "Нет активных соединений.");
+  else tgHero("ok", "Прокси активен", "Подключите Telegram.");
+  const tgl = $("btnTgToggle"), tlab = g.running ? "Отключить прокси" : "Включить прокси";
+  tgl.setAttribute("aria-label", tlab); tgl.title = tlab;
+  $("tgErr").textContent = g.err || "";
+  $("tgPort").textContent = g.port;
+  $("tgSecret").textContent = "dd" + (g.link.split("secret=dd")[1] || "");
+  $("tgStatsBlock").style.display = g.running && st.total ? "" : "none";
+  const mb = n => n < 1048576 ? (n / 1024).toFixed(0) + " КБ" : (n / 1048576).toFixed(1) + " МБ";
+  const routes = [["через WebSocket", st.via_ws], ["напрямую", st.via_tcp], ["не удалось", st.no_route]].filter(r => r[1]);
+  const wsAgo = st.ws_last_ok ? Math.round(now - st.ws_last_ok) : 0;
+  const deadWS = st.dead_ws || 0, okWS = st.answered_ws || 0;
+  const noData = st.via_ws >= 5 && !okWS && deadWS >= 5;
+  $("tgDirect").textContent = noData
+    ? "Нет ответа от Telegram (" + deadWS + "). См. журнал."
+    : st.ws_err
+    ? "WebSocket недоступен (" + st.ws_err + "), используется TCP."
+    : st.ws_last_ok ? "WebSocket работает." : "";
+  $("tgStats").innerHTML =
+    `<div class="tile n"><b>${st.active || 0}</b><span>открыто сейчас</span></div>` +
+    `<div class="tile n"><b>${mb((st.bytes_up || 0) + (st.bytes_down || 0))}</b><span>трафика за сеанс</span></div>` +
+    routes.map(r => `<div class="tile n${r[0] === "не удалось" ? " bad" : ""}"><b>${r[1]}</b><span>${r[0]}</span></div>`).join("");
+
+
+  maybeCheckDiscord();
+  const lg = $("log"), atBottom = lg.scrollTop + lg.clientHeight >= lg.scrollHeight - 20;
+  lg.textContent = (s.log || []).join("\n");
+  if (atBottom) lg.scrollTop = lg.scrollHeight;
+}
+
+// вкладки
+// при открытии вкладки Discord проверяем его сами, если давно не проверяли
+let dcAutoAt = 0;
+function maybeCheckDiscord() {
+  if (!S || S.tune.running || !S.setup_ready || !$("tab-discord").classList.contains("on")) return;
+  if (Date.now() - dcAutoAt < 60000) return;
+  if (S.discord.checks.running || (S.discord.checks.at && Date.now() / 1000 - S.discord.checks.at < 60)) return;
+  dcAutoAt = Date.now(); api("/api/discord/check");
+}
+function showTab(name) {
+  document.querySelectorAll("nav [data-tab]").forEach(b => b.setAttribute("aria-selected", b.dataset.tab === name));
+  document.querySelectorAll("section.tab").forEach(x => x.classList.toggle("on", x.id === "tab-" + name));
+  $("bg").dataset.v = {home: "eye", discord: "stairs", tg: "hole", settings: "chain", adv: "grin"}[name] || "eye";
+  try { localStorage.setItem("nb-tab", name); } catch (_) {}
+  maybeCheckDiscord();
+}
+document.querySelectorAll("nav [data-tab]").forEach(b => b.onclick = () => showTab(b.dataset.tab));
+try { const t = localStorage.getItem("nb-tab"); if (t && $("tab-" + t)) showTab(t); } catch (_) {}
+$("tuneDet").addEventListener("toggle", () => { $("tuneDet").dataset.touched = "1"; });
+
+$("btnToggle").onclick = () => api(S.engine.running ? "/api/stop" : "/api/start");
+$("btnTune").onclick = () => api("/api/tune");
+$("btnTuneCancel").onclick = () => api("/api/tune/cancel");
+$("btnInstall").onclick = () => api("/api/setup/install");
+$("btnCheck").onclick = () => api("/api/check");
+$("btnApply").onclick = () => api("/api/select", {name: $("strat").value});
+$("oAuto").onchange = e => api("/api/autostart", {enabled: e.target.checked});
+$("oBoot").onchange = e => api("/api/settings", {auto_start_bypass: e.target.checked});
+$("oRetune").onchange = e => api("/api/settings", {auto_retune: e.target.checked});
+$("oExtra").onchange = e => api("/api/settings", {extra_strategies: e.target.checked});
+$("oGame").onchange = e => api("/api/settings", {game_filter: e.target.checked});
+$("oLang").onchange = async ev => { const j = await api("/api/settings", {lang: ev.target.value}); if (j && j.ok) location.reload(); };
+document.addEventListener("change", ev => { const c = ev.target; if (c && c.dataset && c.dataset.g) api("/api/settings", {groups: {[c.dataset.g]: c.checked}}); });
+$("btnDcOn").onclick = () => api("/api/start");
+$("btnDcCheck").onclick = () => api("/api/discord/check");
+$("btnDcTune").onclick = () => api("/api/discord/tune");
+$("btnDcCancel").onclick = () => api("/api/tune/cancel");
+$("btnDcNext").onclick = async () => { const j = await api("/api/discord/next"); if (j && j.ok) toast("Стратегия изменена. Перезайдите в канал."); };
+$("oDcDirect").onchange = async e => {
+  const on = e.target.checked;
+  const j = await api("/api/settings", {discord_direct: on});
+  if (!j || !j.ok || S.os !== "windows") return;
+  const r = await api("/api/discord/restart");
+  if (r && r.ok) toast(on ? "Перезапускаю Discord мимо прокси VPN…" : "Перезапускаю Discord обычным способом…");
+};
+$("btnDcRestart").onclick = async () => { const j = await api("/api/discord/restart"); if (j && j.ok) toast("Перезапуск Discord…"); };
+$("btnTgToggle").onclick = () => api(S.tg.running ? "/api/tg/stop" : "/api/tg/start");
+$("btnTgOpen").onclick = async () => { const j = await api("/api/tg/open"); if (j && j.ok) toast("Подтвердите подключение в Telegram"); };
+$("btnTgCopy").onclick = async () => {
+  try { await navigator.clipboard.writeText(S.tg.link); toast("Ссылка скопирована"); }
+  catch (_) { prompt("Скопируйте ссылку:", S.tg.link); }
+};
+$("btnQuit").onclick = async () => {
+  if (!confirm("Выйти и отключить обход?")) return;
+  await api("/api/quit");
+  clearInterval(pollT);
+  document.body.innerHTML = '<p style="padding:60px 16px;text-align:center;color:#ded8ca;background:#0a0a0b;font-family:Courier New,monospace">Программа закрыта.</p>';
+};
+
+// Внешние ссылки открываем в браузере по умолчанию: во встроенном окне им делать нечего
+document.addEventListener("click", ev => {
+  const a = ev.target && ev.target.closest ? ev.target.closest("a[href]") : null;
+  if (!a || !/^https:\/\//i.test(a.href)) return;
+  ev.preventDefault();
+  api("/api/openurl", { url: a.href });
+});
+
+// Повторный запуск программы шлёт сюда «show»: вместо новой вкладки обновляем эту
+try {
+  const es = new EventSource("/api/events?t=" + encodeURIComponent(TOKEN));
+  es.onmessage = ev => {
+    if (ev.data !== "show") return;
+    try { window.focus(); } catch (_) {}
+    location.reload();
+  };
+} catch (_) {}
+
+tick(); const pollT = setInterval(tick, 1000);
+</script>
+</body>
+</html>
