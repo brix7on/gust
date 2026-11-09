@@ -51,8 +51,11 @@ func RelaunchAsAdmin(args []string) bool {
 	return r > 32
 }
 
-// KillWinws снимает все процессы winws, оставшиеся от прошлого запуска.
-func KillWinws() { _, _ = runHidden("taskkill", "/F", "/IM", "winws.exe") }
+// KillWinws снимает процессы winws и gust-engine, оставшиеся от прошлого запуска.
+func KillWinws() {
+	_, _ = runHidden("taskkill", "/F", "/IM", "winws.exe")
+	_, _ = runHidden("taskkill", "/F", "/IM", "gust-engine.exe")
+}
 
 // CleanupDivert останавливает драйвер WinDivert (как service.bat). Между пробами стратегий
 // службу только останавливаем; удаляем (remove=true) лишь при выходе/переустановке —

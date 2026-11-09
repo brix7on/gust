@@ -5,10 +5,14 @@
 pub struct Addr(pub [u8; 80]);
 
 impl Addr {
-    // Пакет собран заново: контрольные суммы IP/TCP уже посчитаны.
+    // Пакет собран заново: контрольные суммы IP/TCP/UDP уже посчитаны.
     pub fn mark_checksums(mut self) -> Addr {
-        self.0[10] |= 0x60;
+        self.0[10] |= 0xe0;
         self
+    }
+
+    pub fn outbound(&self) -> bool {
+        self.0[10] & 0x02 != 0
     }
 }
 
@@ -114,6 +118,9 @@ mod tests {
         assert_eq!(std::mem::size_of::<super::Addr>(), 80);
         let a = super::Addr([0; 80]).mark_checksums();
         let flags = u32::from_le_bytes([a.0[8], a.0[9], a.0[10], a.0[11]]);
-        assert_eq!(flags, (1 << 21) | (1 << 22));
+        assert_eq!(flags, (1 << 21) | (1 << 22) | (1 << 23));
+        let mut b = super::Addr([0; 80]);
+        b.0[8..12].copy_from_slice(&(1u32 << 17).to_le_bytes());
+        assert!(b.outbound() && !a.outbound());
     }
 }

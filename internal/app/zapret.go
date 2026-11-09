@@ -265,7 +265,7 @@ func (a *App) loadStrategies() []Strategy {
 		}
 		out = append(out, builtinStrategies(root, exe)...)
 	}
-	return out
+	return a.withEngine(out, root, set.Engine)
 }
 
 func (a *App) findStrategy(name string) (Strategy, bool) {

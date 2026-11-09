@@ -21,6 +21,8 @@ DPI bypass for Discord, YouTube and other services on Windows. A single executab
 
 Discord and YouTube are checked by default. Roblox, Instagram, Facebook, X, WhatsApp, Signal, Viber, Snapchat, LinkedIn, Twitch, SoundCloud, Patreon, Medium, Steam Community, RuTracker, NNM-Club, Tor Project, Proton and Telegram web can be enabled in the **More** tab: their domains are added to the bypass list automatically.
 
+Gust ships its own packet engine written in Rust as an alternative to `winws`: choose it under **Settings → Bypass engine** (zapret / Gust / both). It runs the same strategies; it is experimental.
+
 The interface is available in English and Russian. The language follows Windows and can be changed in Settings.
 
 ## Data and startup
@@ -29,7 +31,7 @@ Settings, the zapret build and the log are kept in `C:\ProgramData\Gust`, access
 
 ## Building from source
 
-Requires Go 1.24+. Run `./build.sh`: tests with the race detector, then `dist/Gust.exe`. The experimental Rust engine lives in `engine/`. Releases are built by GitHub Actions on every `v*` tag. Details are in [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
+Requires Go 1.24+. Run `./build.sh`: tests with the race detector, then `dist/Gust.exe`. The Rust engine lives in `engine/` and is embedded into `Gust.exe` at build time. Releases are built by GitHub Actions on every `v*` tag. Details are in [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
 
 ## Disclaimer
 
@@ -60,6 +62,8 @@ Some services are blocked by IP, and DPI bypass can't help those. Use the tool i
 
 По умолчанию проверяются Discord и YouTube. Roblox, Instagram, Facebook, X, WhatsApp, Signal, Viber, Snapchat, LinkedIn, Twitch, SoundCloud, Patreon, Medium, Steam Community, RuTracker, NNM-Club, Tor Project, Proton и сайт Telegram включаются во вкладке **Прочее**: их домены автоматически добавляются в список обхода.
 
+В Gust встроен собственный движок на Rust как альтернатива `winws`: выбирается в **Настройки → Движок обхода** (zapret / Gust / оба). Запускает те же стратегии; пока экспериментальный.
+
 Интерфейс доступен на русском и английском. Язык берётся из Windows и меняется в настройках.
 
 ## Данные и автозапуск
@@ -68,7 +72,7 @@ Some services are blocked by IP, and DPI bypass can't help those. Use the tool i
 
 ## Сборка из исходников
 
-Нужен Go 1.24+. Команда `./build.sh`: тесты с детектором гонок, затем `dist/Gust.exe`. Экспериментальный движок на Rust — в папке `engine/`. Релизы собирает GitHub Actions на каждый тег `v*`. Подробности — в [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
+Нужен Go 1.24+. Команда `./build.sh`: тесты с детектором гонок, затем `dist/Gust.exe`. Движок на Rust — в папке `engine/`, при сборке вшивается в `Gust.exe`. Релизы собирает GitHub Actions на каждый тег `v*`. Подробности — в [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
 
 ## Отказ от ответственности
 

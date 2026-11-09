@@ -26,25 +26,27 @@ jobs:
           sudo apt-get install -y -q gcc-mingw-w64-x86-64
           rustup target add x86_64-pc-windows-gnu
 
+      - name: Engine (Rust)
+        working-directory: engine
+        run: |
+          cargo test --locked
+          cargo build --locked
+          cargo build --release --locked --target x86_64-pc-windows-gnu
+
       - name: Test Gust
         run: |
           go vet ./...
           GOOS=windows GOARCH=amd64 go vet ./...
-          go test -race ./...
-
-      - name: Test engine
-        working-directory: engine
-        run: |
-          cargo test --locked
+          GUST_ENGINE_CHECK="$PWD/engine/target/debug/gust-engine" go test -race ./...
 
       - name: Build
         run: |
           mkdir -p dist
+          cp engine/target/x86_64-pc-windows-gnu/release/gust-engine.exe internal/app/enginebin/
+          cp engine/target/x86_64-pc-windows-gnu/release/gust-engine.exe dist/
           ver=""
           case "$GITHUB_REF" in refs/tags/v*) ver="-X gust/internal/app.Version=${GITHUB_REF_NAME#v}" ;; esac
           GOOS=windows GOARCH=amd64 go build -trimpath -ldflags "-H=windowsgui -s -w $ver" -o dist/Gust.exe ./cmd/gust
-          (cd engine && cargo build --release --locked --target x86_64-pc-windows-gnu)
-          cp engine/target/x86_64-pc-windows-gnu/release/gust-engine.exe dist/
 
       - name: Package
         run: |
@@ -66,6 +68,6 @@ jobs:
         run: |
           gh release create "$GITHUB_REF_NAME" ./*.zip \
             --title "Gust ${GITHUB_REF_NAME#v}" \
-            --notes "Распакуйте \`Gust-…-windows-x64.zip\` и запустите \`Gust.exe\`. \`gust-engine\` — экспериментальный движок, отдельно пока не нужен.
-          Unpack \`Gust-…-windows-x64.zip\` and run \`Gust.exe\`. \`gust-engine\` is an experimental engine, not needed yet." \
+            --notes "Распакуйте \`Gust-…-windows-x64.zip\` и запустите \`Gust.exe\`. Собственный движок уже встроен в Gust.exe (Настройки → Движок обхода); отдельный \`gust-engine\` — для запуска вручную.
+          Unpack \`Gust-…-windows-x64.zip\` and run \`Gust.exe\`. The own engine is built into Gust.exe (Settings → Bypass engine); the separate \`gust-engine\` is for manual use." \
             --generate-notes

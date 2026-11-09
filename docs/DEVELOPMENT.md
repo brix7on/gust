@@ -77,12 +77,23 @@ GOOS=windows GOARCH=amd64 go build -trimpath -ldflags "-H=windowsgui -s -w" -o d
 
 Прокси Telegram — перенос на Go проекта tg-ws-proxy (Flowseal, MIT). Подробнее — `THIRD_PARTY_NOTICES.md`.
 
-## Движок gust-engine (Rust, экспериментальный)
+## Движок gust-engine (Rust)
 
-`engine/` — собственный движок вместо `winws`: перехват через WinDivert (`WinDivert.dll` из сборки zapret грузится
-динамически), склейка ClientHello из двух пакетов, `multisplit` / `multidisorder` с позициями
-`N, host, endhost, sld, midsld, endsld, sniext[+-N]`, `seqovl` с шаблоном, хостлисты и профили через `--new`.
-Аргументы совпадают с `winws` по смыслу; неподдерживаемые опции — ошибка, а не тихий пропуск.
+`engine/` — собственный движок вместо `winws`, понимает опции `winws` в том объёме, в каком их используют
+`general.bat` сборки и стратегии GU-xx (контрактный тест `TestStrategiesAcceptedByEngine` прогоняет их все через
+`gust-engine --check`). Неподдерживаемая опция — ошибка запуска, а не тихий пропуск.
+
+- перехват через WinDivert: `WinDivert.dll` из сборки zapret грузится динамически;
+- TCP: склейка ClientHello из двух сегментов, повтор обработки при ретрансмиссии, каждый HTTP-запрос в keep-alive;
+- режимы `fake`, `syndata`, `multisplit`, `multidisorder`, `fakedsplit`, `fakeddisorder`, `hostfakesplit`, `seqovl`, `wssize`;
+- фейки: свой ClientHello (517 байт), моды `rnd`, `rndsni`, `dupsid`, `sni=`, `padencap`; HTTP, QUIC, Discord, STUN, unknown;
+- fooling: `ttl`, `autottl` (хопы по входящему SYN-ACK), `md5sig`, `badseq`, `badsum`, `ts`, `datanoack`, `--ip-id=zero`;
+  фейк без рабочего fooling не отправляется (иначе он дошёл бы до сервера);
+- UDP: расшифровка QUIC Initial v1/v2 (RFC 9001/9369, проверено на эталонных векторах) ради SNI, склейка CRYPTO из
+  двух датаграмм, Discord IP Discovery и STUN, `any-protocol` и `cutoff`, ipset (CIDR, IPv4/IPv6).
+
+Gust вшивает движок в exe (`internal/app/enginebin`, go:embed), распаковывает в `C:\ProgramData\Gust\engine` и строит
+для каждой стратегии двойника «Gust · имя». Настройка «Движок обхода»: zapret / Gust / оба.
 
 ```sh
 cd engine

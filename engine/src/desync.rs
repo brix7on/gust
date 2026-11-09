@@ -1,8 +1,9 @@
-// Позиции разреза и план сегментов (multisplit / multidisorder / seqovl).
+// Позиции разреза и план отправки: multisplit/multidisorder, fakedsplit/fakeddisorder, hostfakesplit, seqovl.
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Mark {
     Abs,
+    Method,
     Host,
     EndHost,
     Sld,
@@ -15,6 +16,15 @@ pub enum Mark {
 pub struct Pos {
     pub mark: Mark,
     pub off: i32,
+}
+
+// Что известно о данных: длина, где имя хоста, тип протокола.
+pub struct Ctx<'a> {
+    pub len: usize,
+    pub host: Option<(usize, usize)>,
+    pub host_str: &'a str,
+    pub tls: bool,
+    pub http: bool,
 }
 
 impl Pos {
@@ -30,6 +40,7 @@ impl Pos {
             None => (s, 0),
         };
         let mark = match name {
+            "method" => Mark::Method,
             "host" => Mark::Host,
             "endhost" => Mark::EndHost,
             "sld" => Mark::Sld,
@@ -49,22 +60,32 @@ impl Pos {
         Ok(Pos { mark, off })
     }
 
-    // Абсолютное смещение в данных; None — маркер неприменим.
-    pub fn resolve(&self, len: usize, sni: Option<(usize, usize)>, host: &str) -> Option<usize> {
+    pub fn resolve(&self, c: &Ctx) -> Option<usize> {
         let base: i64 = match self.mark {
             Mark::Abs => {
                 if self.off < 0 {
-                    len as i64
+                    c.len as i64
                 } else {
                     0
                 }
             }
-            Mark::SniExt => sni?.0 as i64 - 9,
-            Mark::Host => sni?.0 as i64,
-            Mark::EndHost => sni?.1 as i64,
+            Mark::Method => {
+                if !c.http {
+                    return None;
+                }
+                0
+            }
+            Mark::SniExt => {
+                if !c.tls {
+                    return None;
+                }
+                c.host?.0 as i64 - 5
+            }
+            Mark::Host => c.host?.0 as i64,
+            Mark::EndHost => c.host?.1 as i64,
             Mark::Sld | Mark::MidSld | Mark::EndSld => {
-                let (s, e) = sld(host)?;
-                let start = sni?.0 as i64;
+                let (s, e) = sld(c.host_str)?;
+                let start = c.host?.0 as i64;
                 match self.mark {
                     Mark::Sld => start + s as i64,
                     Mark::EndSld => start + e as i64,
@@ -73,11 +94,10 @@ impl Pos {
             }
         };
         let v = base + self.off as i64;
-        (v > 0 && (v as usize) < len).then_some(v as usize)
+        (v > 0 && (v as usize) < c.len).then_some(v as usize)
     }
 }
 
-// Границы домена второго уровня внутри имени хоста.
 pub fn sld(host: &str) -> Option<(usize, usize)> {
     let h = host.trim_end_matches('.');
     let last = h.rfind('.')?;
@@ -85,102 +105,235 @@ pub fn sld(host: &str) -> Option<(usize, usize)> {
     (last > start).then_some((start, last))
 }
 
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum Split {
+    None,
+    Multi { disorder: bool },
+    Faked { disorder: bool },
+    HostFake,
+}
+
 #[derive(Debug, Clone, PartialEq)]
-pub struct Desync {
-    pub disorder: bool,
+pub struct Plan {
+    pub split: Split,
     pub positions: Vec<Pos>,
     pub seqovl: usize,
-    pub pattern: Vec<u8>,
+    pub seqovl_pattern: Vec<u8>,
+    pub faked_pattern: Vec<u8>,
+    pub fake_host: Option<String>,
+    pub midhost: Option<Pos>,
 }
 
-#[derive(Debug, Clone, PartialEq)]
-pub struct Seg {
-    pub rel_seq: i64,
-    pub data: Vec<u8>,
-}
-
-impl Desync {
-    // План отправки: сегменты со сдвигом seq относительно начала данных.
-    pub fn plan(
-        &self,
-        data: &[u8],
-        sni: Option<(usize, usize)>,
-        host: &str,
-        mss: usize,
-    ) -> Vec<Seg> {
-        let mss = mss.max(64);
-        let mut cuts: Vec<usize> = self
-            .positions
-            .iter()
-            .filter_map(|p| p.resolve(data.len(), sni, host))
-            .collect();
-        cuts.sort_unstable();
-        cuts.dedup();
-        let mut bounds = vec![0];
-        bounds.extend(cuts);
-        bounds.push(data.len());
-        let mut segs = Vec::new();
-        for w in bounds.windows(2) {
-            let mut a = w[0];
-            while a < w[1] {
-                let b = (a + mss).min(w[1]);
-                segs.push(Seg {
-                    rel_seq: a as i64,
-                    data: data[a..b].to_vec(),
-                });
-                a = b;
-            }
+impl Default for Plan {
+    fn default() -> Self {
+        Plan {
+            split: Split::None,
+            positions: vec![],
+            seqovl: 0,
+            seqovl_pattern: vec![],
+            faked_pattern: vec![0],
+            fake_host: None,
+            midhost: None,
         }
-        if self.seqovl > 0 && !segs.is_empty() {
-            let room = mss.saturating_sub(self.seqovl).max(1);
-            if segs[0].data.len() > room {
-                let rest = segs[0].data.split_off(room);
-                segs.insert(
-                    1,
-                    Seg {
-                        rel_seq: room as i64,
-                        data: rest,
-                    },
-                );
-            }
-            let mut first = filler(&self.pattern, self.seqovl);
-            first.extend_from_slice(&segs[0].data);
-            segs[0] = Seg {
-                rel_seq: -(self.seqovl as i64),
-                data: first,
-            };
-        }
-        if self.disorder {
-            segs.reverse();
-        }
-        segs
     }
 }
 
-fn filler(pattern: &[u8], n: usize) -> Vec<u8> {
+#[derive(Debug, Clone, PartialEq)]
+pub struct Piece {
+    pub rel: i64,
+    pub data: Vec<u8>,
+    pub fake: bool,
+}
+
+fn fill(pattern: &[u8], n: usize) -> Vec<u8> {
     if pattern.is_empty() {
         return vec![0; n];
     }
     pattern.iter().copied().cycle().take(n).collect()
 }
 
+fn real(out: &mut Vec<Piece>, data: &[u8], a: usize, b: usize, mss: usize) {
+    let mut x = a;
+    while x < b {
+        let y = (x + mss).min(b);
+        out.push(Piece {
+            rel: x as i64,
+            data: data[x..y].to_vec(),
+            fake: false,
+        });
+        x = y;
+    }
+}
+
+// Поддельное имя той же длины: шаблон host= (дополненный слева) или случайные буквы с теми же точками.
+pub fn fake_host(real: &[u8], tpl: Option<&str>) -> Vec<u8> {
+    let n = real.len();
+    let Some(t) = tpl else {
+        return real
+            .iter()
+            .map(|&c| {
+                if c == b'.' {
+                    b'.'
+                } else {
+                    crate::rng::letters(1).as_bytes()[0]
+                }
+            })
+            .collect();
+    };
+    let t = t.as_bytes();
+    let mut v = if t.len() >= n {
+        t[t.len() - n..].to_vec()
+    } else if n - t.len() == 1 {
+        [crate::rng::letters(1).as_bytes(), t].concat()
+    } else {
+        [crate::rng::letters(n - t.len() - 1).as_bytes(), b".", t].concat()
+    };
+    if v.first() == Some(&b'.') {
+        v[0] = b'a';
+    }
+    v
+}
+
+impl Plan {
+    pub fn pieces(&self, data: &[u8], c: &Ctx, mss: usize) -> Vec<Piece> {
+        let mss = mss.max(64);
+        let len = data.len();
+        let mut out = vec![];
+        match self.split {
+            Split::None => real(&mut out, data, 0, len, mss),
+            Split::Multi { disorder } => {
+                let mut cuts: Vec<usize> =
+                    self.positions.iter().filter_map(|p| p.resolve(c)).collect();
+                cuts.sort_unstable();
+                cuts.dedup();
+                let mut bounds = vec![0];
+                bounds.extend(cuts);
+                bounds.push(len);
+                for w in bounds.windows(2) {
+                    real(&mut out, data, w[0], w[1], mss);
+                }
+                if self.seqovl > 0 && !out.is_empty() {
+                    let room = mss.saturating_sub(self.seqovl).max(1);
+                    if out[0].data.len() > room {
+                        let rest = out[0].data.split_off(room);
+                        out.insert(
+                            1,
+                            Piece {
+                                rel: room as i64,
+                                data: rest,
+                                fake: false,
+                            },
+                        );
+                    }
+                    let mut first = fill(&self.seqovl_pattern, self.seqovl);
+                    first.extend_from_slice(&out[0].data);
+                    out[0] = Piece {
+                        rel: -(self.seqovl as i64),
+                        data: first,
+                        fake: false,
+                    };
+                }
+                if disorder {
+                    out.reverse();
+                }
+            }
+            Split::Faked { disorder } => {
+                let cut = self.positions.iter().find_map(|p| p.resolve(c));
+                let mut parts = match cut {
+                    Some(x) => vec![(0, x), (x, len)],
+                    None => vec![(0, len)],
+                };
+                if disorder {
+                    parts.reverse();
+                }
+                for (a, b) in parts {
+                    let mut chunks = vec![];
+                    real(&mut chunks, data, a, b, mss);
+                    for ch in chunks {
+                        let f = Piece {
+                            rel: ch.rel,
+                            data: fill(&self.faked_pattern, ch.data.len()),
+                            fake: true,
+                        };
+                        out.push(f.clone());
+                        out.push(ch);
+                        out.push(f);
+                    }
+                }
+            }
+            Split::HostFake => {
+                let Some((hs, he)) = c.host.filter(|&(s, e)| s > 0 && e <= len && e > s) else {
+                    real(&mut out, data, 0, len, mss);
+                    return out;
+                };
+                let fh = Piece {
+                    rel: hs as i64,
+                    data: fake_host(&data[hs..he], self.fake_host.as_deref()),
+                    fake: true,
+                };
+                real(&mut out, data, 0, hs, mss);
+                out.push(fh.clone());
+                let mid = self
+                    .midhost
+                    .and_then(|p| p.resolve(c))
+                    .filter(|&m| m > hs && m < he);
+                match mid {
+                    Some(m) => {
+                        real(&mut out, data, hs, m, mss);
+                        real(&mut out, data, m, he, mss);
+                    }
+                    None => real(&mut out, data, hs, he, mss),
+                }
+                out.push(fh);
+                real(&mut out, data, he, len, mss);
+            }
+        }
+        out
+    }
+}
+
 #[cfg(test)]
-mod tests {
+pub mod tests {
     use super::*;
     use crate::tls;
 
-    // Как соберёт получатель: байты до начала данных отбрасываются.
-    fn reassemble(segs: &[Seg], seqovl: usize) -> Vec<u8> {
-        let mut s = segs.to_vec();
-        s.sort_by_key(|x| x.rel_seq);
+    // Что соберёт получатель из настоящих кусков (фейки до него не доходят).
+    pub fn reassemble(pieces: &[Piece]) -> Vec<u8> {
+        let mut s: Vec<&Piece> = pieces.iter().filter(|p| !p.fake).collect();
+        s.sort_by_key(|x| x.rel);
         let mut out = Vec::new();
         for x in s {
-            let skip = (-x.rel_seq).max(0) as usize;
-            assert!(skip == 0 || skip == seqovl);
-            assert_eq!(x.rel_seq.max(0) as usize, out.len());
-            out.extend_from_slice(&x.data[skip..]);
+            let skip = (-x.rel).max(0) as usize;
+            let start = x.rel.max(0) as usize;
+            assert!(start <= out.len(), "hole before {start}");
+            let have = out.len() - start;
+            if x.data.len() - skip > have {
+                out.extend_from_slice(&x.data[skip + have..]);
+            }
         }
         out
+    }
+
+    fn tls_ctx<'a>(d: &[u8], host: &'a str) -> Ctx<'a> {
+        Ctx {
+            len: d.len(),
+            host: tls::sni(d),
+            host_str: host,
+            tls: true,
+            http: false,
+        }
+    }
+
+    fn plan(split: Split, pos: &str) -> Plan {
+        Plan {
+            split,
+            positions: pos
+                .split(',')
+                .filter(|x| !x.is_empty())
+                .map(|p| Pos::parse(p).unwrap())
+                .collect(),
+            ..Plan::default()
+        }
     }
 
     #[test]
@@ -189,13 +342,6 @@ mod tests {
         assert_eq!(sld("discord.gg"), Some((0, 7)));
         assert_eq!(sld("localhost"), None);
         assert_eq!(
-            Pos::parse("midsld").unwrap(),
-            Pos {
-                mark: Mark::MidSld,
-                off: 0
-            }
-        );
-        assert_eq!(
             Pos::parse("host+1").unwrap(),
             Pos {
                 mark: Mark::Host,
@@ -203,65 +349,136 @@ mod tests {
             }
         );
         assert_eq!(
-            Pos::parse("-10").unwrap(),
+            Pos::parse("method+2").unwrap(),
             Pos {
-                mark: Mark::Abs,
-                off: -10
+                mark: Mark::Method,
+                off: 2
             }
         );
         assert!(Pos::parse("bogus").is_err());
-        let p = Pos::parse("midsld").unwrap();
-        assert_eq!(p.resolve(100, Some((50, 65)), "www.youtube.com"), Some(57));
-        assert_eq!(p.resolve(100, None, ""), None);
-        assert_eq!(Pos::parse("-10").unwrap().resolve(100, None, ""), Some(90));
-        assert_eq!(Pos::parse("500").unwrap().resolve(100, None, ""), None);
+        let c = Ctx {
+            len: 100,
+            host: Some((50, 65)),
+            host_str: "www.youtube.com",
+            tls: true,
+            http: false,
+        };
+        assert_eq!(Pos::parse("midsld").unwrap().resolve(&c), Some(57));
+        assert_eq!(Pos::parse("sniext+1").unwrap().resolve(&c), Some(46));
+        assert_eq!(Pos::parse("method+2").unwrap().resolve(&c), None);
+        assert_eq!(Pos::parse("-10").unwrap().resolve(&c), Some(90));
+        assert_eq!(Pos::parse("500").unwrap().resolve(&c), None);
+        let h = Ctx {
+            http: true,
+            tls: false,
+            ..c
+        };
+        assert_eq!(Pos::parse("method+2").unwrap().resolve(&h), Some(2));
+        assert_eq!(Pos::parse("sniext").unwrap().resolve(&h), None);
     }
 
     #[test]
-    fn multisplit_reassembles() {
+    fn multisplit_and_seqovl() {
         let ch = tls::tests::client_hello("www.youtube.com", 0);
-        let sni = tls::sni(&ch);
-        let d = Desync {
-            disorder: false,
-            positions: vec![Pos::parse("1").unwrap(), Pos::parse("midsld").unwrap()],
-            seqovl: 0,
-            pattern: vec![],
-        };
-        let segs = d.plan(&ch, sni, "www.youtube.com", 1460);
-        assert_eq!(segs.len(), 3);
-        assert_eq!(segs[0].data.len(), 1);
-        assert_eq!(reassemble(&segs, 0), ch);
-    }
-
-    #[test]
-    fn seqovl_prefix_and_disorder() {
-        let ch = tls::tests::client_hello("discord.com", 0);
-        let d = Desync {
-            disorder: true,
-            positions: vec![Pos::parse("1").unwrap()],
+        let c = tls_ctx(&ch, "www.youtube.com");
+        let p = plan(Split::Multi { disorder: false }, "1,midsld");
+        let s = p.pieces(&ch, &c, 1460);
+        assert_eq!(s.len(), 3);
+        assert_eq!(reassemble(&s), ch);
+        let p = Plan {
             seqovl: 681,
-            pattern: b"PAT".to_vec(),
+            seqovl_pattern: b"PAT".to_vec(),
+            ..plan(Split::Multi { disorder: true }, "1")
         };
-        let segs = d.plan(&ch, tls::sni(&ch), "discord.com", 1460);
-        let first = segs.iter().find(|s| s.rel_seq < 0).unwrap();
-        assert_eq!(first.rel_seq, -681);
-        assert_eq!(&first.data[..6], b"PATPAT");
-        assert_eq!(first.data.len(), 682);
-        assert_eq!(segs.last().unwrap().rel_seq, -681);
-        assert_eq!(reassemble(&segs, 681), ch);
+        let s = p.pieces(&ch, &c, 1460);
+        let first = s.last().unwrap();
+        assert_eq!(
+            (first.rel, &first.data[..6], first.data.len()),
+            (-681, &b"PATPAT"[..], 682)
+        );
+        assert_eq!(reassemble(&s), ch);
     }
 
     #[test]
-    fn respects_mss() {
+    fn mss_respected() {
         let ch = tls::tests::client_hello("x.com", 3000);
-        let d = Desync {
-            disorder: false,
-            positions: vec![Pos::parse("2").unwrap()],
-            seqovl: 600,
-            pattern: vec![1],
+        let c = tls_ctx(&ch, "x.com");
+        for p in [
+            Plan {
+                seqovl: 600,
+                seqovl_pattern: vec![1],
+                ..plan(Split::Multi { disorder: false }, "2")
+            },
+            plan(Split::Faked { disorder: false }, "2"),
+            plan(Split::HostFake, ""),
+            plan(Split::None, ""),
+        ] {
+            let s = p.pieces(&ch, &c, 1400);
+            assert!(s.iter().all(|x| x.data.len() <= 1400));
+            assert_eq!(reassemble(&s), ch);
+        }
+    }
+
+    #[test]
+    fn fakedsplit_order() {
+        let d: Vec<u8> = (0..20).collect();
+        let c = Ctx {
+            len: 20,
+            host: None,
+            host_str: "",
+            tls: false,
+            http: false,
         };
-        let segs = d.plan(&ch, tls::sni(&ch), "x.com", 1400);
-        assert!(segs.iter().all(|s| s.data.len() <= 1400));
-        assert_eq!(reassemble(&segs, 600), ch);
+        let s = Plan {
+            faked_pattern: vec![0xee],
+            ..plan(Split::Faked { disorder: false }, "5")
+        }
+        .pieces(&d, &c, 1460);
+        let shape: Vec<(i64, usize, bool)> =
+            s.iter().map(|p| (p.rel, p.data.len(), p.fake)).collect();
+        assert_eq!(
+            shape,
+            vec![
+                (0, 5, true),
+                (0, 5, false),
+                (0, 5, true),
+                (5, 15, true),
+                (5, 15, false),
+                (5, 15, true)
+            ]
+        );
+        assert!(s[0].data.iter().all(|&b| b == 0xee));
+        let r = plan(Split::Faked { disorder: true }, "5").pieces(&d, &c, 1460);
+        assert_eq!(r[1].rel, 5);
+        assert_eq!(reassemble(&r), d);
+    }
+
+    #[test]
+    fn hostfakesplit() {
+        let ch = tls::tests::client_hello("www.youtube.com", 0);
+        let c = tls_ctx(&ch, "www.youtube.com");
+        let (hs, he) = c.host.unwrap();
+        let p = Plan {
+            fake_host: Some("ya.ru".into()),
+            midhost: Some(Pos::parse("midsld").unwrap()),
+            ..plan(Split::HostFake, "")
+        };
+        let s = p.pieces(&ch, &c, 1460);
+        let fakes: Vec<&Piece> = s.iter().filter(|x| x.fake).collect();
+        assert_eq!(fakes.len(), 2);
+        assert_eq!(fakes[0].rel, hs as i64);
+        assert_eq!(fakes[0].data.len(), he - hs);
+        assert!(fakes[0].data.ends_with(b".ya.ru"));
+        assert_eq!(s.iter().filter(|x| !x.fake).count(), 4);
+        assert_eq!(reassemble(&s), ch);
+    }
+
+    #[test]
+    fn fake_host_shapes() {
+        assert_eq!(fake_host(b"ab.cd", Some("ya.ru")), b"ya.ru");
+        assert_eq!(fake_host(b"a.b", Some("ya.ru")), b"aru");
+        assert_eq!(fake_host(b"abcdef", Some("ya.ru"))[1..], *b"ya.ru");
+        let r = fake_host(b"www.youtube.com", None);
+        assert_eq!((r.len(), r[3], r[11]), (15, b'.', b'.'));
     }
 }

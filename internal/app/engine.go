@@ -50,14 +50,14 @@ func (e *Engine) State() EngineState {
 	return st
 }
 
-func (e *Engine) addTail(line string) {
+func (e *Engine) addTail(name, line string) {
 	e.mu.Lock()
 	e.tail = append(e.tail, line)
 	if len(e.tail) > 12 {
 		e.tail = e.tail[len(e.tail)-12:]
 	}
 	e.mu.Unlock()
-	e.app.logf("winws: %s", line)
+	e.app.logf("%s: %s", name, line)
 }
 
 func friendlyWinwsError(tail []string) string {
@@ -85,7 +85,7 @@ func (e *Engine) Start(s Strategy, want bool) error {
 	root := e.app.zapretRoot()
 	// Защита: запускаем только winws.exe из папки сборки. Если подменённый .bat ссылается
 	// на другой exe, мы бы запустили его с правами администратора — не даём.
-	if !exeAllowed(root, s.Exe) {
+	if !exeAllowed(root, s.Exe) && !e.app.isEngineExe(s.Exe) {
 		e.mu.Lock()
 		e.lastErr = "стратегия ссылается на посторонний исполняемый файл"
 		e.mu.Unlock()
@@ -94,6 +94,7 @@ func (e *Engine) Start(s Strategy, want bool) error {
 	ensureLists(root, s.Args)
 	e.app.logf("запускаю стратегию «%s»", s.Name)
 
+	name := strings.TrimSuffix(strings.ToLower(filepath.Base(s.Exe)), ".exe")
 	cmd := exec.Command(s.Exe, s.Args...)
 	cmd.Dir = filepath.Dir(s.Exe)
 	platform.HideWindow(cmd)
@@ -103,7 +104,7 @@ func (e *Engine) Start(s Strategy, want bool) error {
 		sc := bufio.NewScanner(pr)
 		for sc.Scan() {
 			if t := strings.TrimSpace(sc.Text()); t != "" {
-				e.addTail(t)
+				e.addTail(name, t)
 			}
 		}
 	}()

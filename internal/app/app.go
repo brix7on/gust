@@ -24,6 +24,7 @@ type Settings struct {
 	TGEnabled       bool            `json:"tg_enabled"`     // прокси Telegram включён — поднимаем при запуске
 	LastTune        int64           `json:"last_tune"`
 	Lang            string          `json:"lang"`        // auto, ru, en
+	Engine          string          `json:"engine"`      // zapret, gust, both
 	AddedHosts      []string        `json:"added_hosts"` // домены, которые программа сама дописала в list-general-user.txt
 }
 
@@ -33,6 +34,7 @@ func defaultSettings() Settings {
 		ExtraStrategies: true,
 		AutoStartBypass: true,
 		Lang:            "auto",
+		Engine:          "zapret",
 		Groups:          fillGroups(nil),
 	}
 }
@@ -76,6 +78,8 @@ type App struct {
 	quitO   sync.Once
 
 	skipLogged sync.Map // имена .bat, про которые уже написали в журнал
+	engOnce    sync.Once
+	enginePath string
 
 	mu         sync.Mutex
 	set        Settings
@@ -196,6 +200,9 @@ func (a *App) loadSettings() {
 		return
 	}
 	s.Groups = fillGroups(s.Groups)
+	if s.Engine != "gust" && s.Engine != "both" {
+		s.Engine = "zapret"
+	}
 	a.set = s
 }
 

@@ -5,23 +5,34 @@ mod desync;
 mod divert;
 mod engine;
 mod hostlist;
+mod http;
+mod ipset;
+mod l7;
 mod packet;
+mod quic;
+mod rng;
 mod tls;
 
 use std::process::exit;
 
-const USAGE: &str = "gust-engine — packet-level DPI desync (WinDivert)
+const USAGE: &str = "gust-engine — packet-level DPI desync for Windows (WinDivert), winws-compatible options
 
-  --wf-tcp=PORTS                    ports to intercept (default: from --filter-tcp, or 443)
-  --windivert=PATH                  WinDivert.dll (default: next to the exe)
-  --filter-tcp=PORTS                profile: ports
-  --hostlist=FILE --hostlist-domains=a,b
-  --hostlist-exclude=FILE --hostlist-exclude-domains=a,b
-  --dpi-desync=multisplit|multidisorder
-  --dpi-desync-split-pos=N,host,endhost,sld,midsld,endsld,sniext[+-N]
-  --dpi-desync-split-seqovl=N --dpi-desync-split-seqovl-pattern=FILE|0xHEX
-  --new                             start next profile
-  --check                           validate arguments and exit";
+global:   --wf-tcp=PORTS --wf-udp=PORTS --windivert=PATH\\WinDivert.dll --check --version
+profile:  --filter-tcp=PORTS --filter-udp=PORTS --filter-l7=tls,http,quic,discord,stun,unknown
+          --hostlist=FILE --hostlist-domains=a,b --hostlist-exclude=FILE --hostlist-exclude-domains=a,b
+          --ipset=FILE --ipset-ip=CIDR,.. --ipset-exclude=FILE --ipset-exclude-ip=CIDR,.. --ip-id=seq|zero
+desync:   --dpi-desync=[fake,][syndata,]multisplit|multidisorder|fakedsplit|fakeddisorder|hostfakesplit
+          --dpi-desync-split-pos=N,method,host,endhost,sld,midsld,endsld,sniext[+-N]
+          --dpi-desync-split-seqovl=N --dpi-desync-split-seqovl-pattern=FILE|0xHEX
+          --dpi-desync-fakedsplit-pattern=FILE|0xHEX --dpi-desync-hostfakesplit-mod=host=NAME
+          --dpi-desync-hostfakesplit-midhost=POS --dpi-desync-repeats=N
+          --dpi-desync-fooling=md5sig,badseq,badsum,ts,datanoack --dpi-desync-ttl[6]=N
+          --dpi-desync-autottl[6]=DELTA[:MIN-MAX] --dpi-desync-badseq-increment=N
+          --dpi-desync-badack-increment=N --dpi-desync-ts-increment=N
+          --dpi-desync-fake-tls=FILE|0xHEX --dpi-desync-fake-tls-mod=rnd,rndsni,dupsid,padencap,sni=NAME
+          --dpi-desync-fake-{http,quic,discord,stun,unknown,unknown-udp,syndata}=FILE|0xHEX
+          --dpi-desync-any-protocol=1 --dpi-desync-cutoff=nN|dN|sN --wssize=WIN[:SCALE]
+          --new  start the next profile";
 
 fn main() {
     let mut args: Vec<String> = std::env::args().skip(1).collect();
@@ -40,11 +51,8 @@ fn main() {
         exit(2)
     });
     if check {
-        println!(
-            "ok: {} profile(s), filter: {}",
-            cfg.profiles.len(),
-            cfg.filter()
-        );
+        println!("ok: {} profile(s)", cfg.profiles.len());
+        println!("filter: {}", cfg.filter());
         return;
     }
     run(cfg);
@@ -71,6 +79,7 @@ fn run(cfg: config::Config) {
         env!("CARGO_PKG_VERSION"),
         cfg.profiles.len()
     );
+    let _ = std::io::stdout().flush();
     let mut eng: engine::Engine<divert::Addr> = engine::Engine::new(cfg);
     let mut buf = vec![0u8; 65535];
     let mut last = Instant::now();
@@ -82,7 +91,7 @@ fn run(cfg: config::Config) {
                 exit(4)
             }
         };
-        for o in eng.handle(buf[..n].to_vec(), addr, Instant::now()) {
+        for o in eng.handle(buf[..n].to_vec(), addr, addr.outbound(), Instant::now()) {
             let a = if o.modified {
                 o.addr.mark_checksums()
             } else {
@@ -90,18 +99,23 @@ fn run(cfg: config::Config) {
             };
             dv.send(&o.pkt, &a);
         }
+        let mut wrote = false;
         for l in eng.log.drain(..) {
             println!("{l}");
+            wrote = true;
         }
         if last.elapsed() >= Duration::from_secs(60) {
             let s = eng.stats;
             println!(
-                "stats: hellos {} desynced {} reassembled {} passed {}",
-                s.hellos, s.desynced, s.reassembled, s.passed
+                "stats: hellos {} desynced {} fakes {} reassembled {} udp {} retrans {}",
+                s.hellos, s.desynced, s.fakes, s.reassembled, s.udp, s.retrans
             );
             last = Instant::now();
+            wrote = true;
         }
-        let _ = std::io::stdout().flush();
+        if wrote {
+            let _ = std::io::stdout().flush();
+        }
     }
 }
 

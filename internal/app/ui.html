@@ -226,6 +226,8 @@
       <div class="panel">
         <div class="set"><div class="t">Расширенный набор<small>Собственные стратегии GU-xx после стандартных.</small></div>
           <label class="sw"><input type="checkbox" id="oExtra"><i></i></label></div>
+        <div class="set" id="engRow" style="display:none"><div class="t">Движок обхода<small>Собственный движок Gust — экспериментальный.</small></div>
+          <select id="oEngine" aria-label="Движок обхода" style="min-width:160px"><option value="zapret">zapret (winws)</option><option value="gust">Gust</option><option value="both">Оба</option></select></div>
         <div class="set"><div class="t">Игровой фильтр<small>Порты 1024–65535. Только при необходимости.</small></div>
           <label class="sw"><input type="checkbox" id="oGame"><i></i></label></div>
       </div>
@@ -392,6 +394,8 @@ if (LANG === "en") (() => {
     "Включать обход при запуске": "Enable bypass on launch", "Автоподбор при сбое": "Re-tune on failure", "Проверка каждые несколько минут.": "Checked every few minutes.",
     "Язык": "Language", "Авто (как в Windows)": "Auto (Windows)",
     "Проверяемые сервисы": "Checked services", "Остальные сервисы — во вкладке «Прочее».": "More services are in the “More” tab.",
+    "Движок обхода": "Bypass engine", "Собственный движок Gust — экспериментальный.": "Gust's own engine is experimental.", "Оба": "Both",
+    "Подбираю стратегию под новый движок": "Re-tuning for the new engine",
     "Стратегии": "Strategies", "Расширенный набор": "Extended set", "Собственные стратегии GU-xx после стандартных.": "Own GU-xx strategies after the standard ones.",
     "Игровой фильтр": "Game filter", "Порты 1024–65535. Только при необходимости.": "Ports 1024–65535. Only if needed.",
     "Включить обход": "Enable bypass", "Отключить обход": "Disable bypass", "Подобрать для Discord": "Tune for Discord", "Состояние": "Status",
@@ -630,6 +634,8 @@ function render() {
     ex.innerHTML = list.map(v => `<label class="chip"><input type="checkbox" data-g="${esc(v.id)}"><span>${esc(v.name)}</span></label>`).join("");
   }
   if (document.activeElement !== $("oLang")) $("oLang").value = s.settings.lang || "auto";
+  $("engRow").style.display = s.engine_available ? "" : "none";
+  if (document.activeElement !== $("oEngine")) $("oEngine").value = s.settings.engine || "zapret";
   document.querySelectorAll("[data-g]").forEach(c => { if (document.activeElement !== c) c.checked = !!s.settings.groups[c.dataset.g]; });
 
   // discord
@@ -732,6 +738,10 @@ $("oBoot").onchange = e => api("/api/settings", {auto_start_bypass: e.target.che
 $("oRetune").onchange = e => api("/api/settings", {auto_retune: e.target.checked});
 $("oExtra").onchange = e => api("/api/settings", {extra_strategies: e.target.checked});
 $("oGame").onchange = e => api("/api/settings", {game_filter: e.target.checked});
+$("oEngine").onchange = async ev => {
+  const j = await api("/api/settings", {engine: ev.target.value});
+  if (j && j.ok && S && S.setup_ready && !S.tune.running) { toast("Подбираю стратегию под новый движок"); await api("/api/tune"); }
+};
 $("oLang").onchange = async ev => { const j = await api("/api/settings", {lang: ev.target.value}); if (j && j.ok) location.reload(); };
 document.addEventListener("change", ev => { const c = ev.target; if (c && c.dataset && c.dataset.g) api("/api/settings", {groups: {[c.dataset.g]: c.checked}}); });
 $("btnDcOn").onclick = () => api("/api/start");

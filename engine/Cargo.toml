@@ -5,6 +5,12 @@ edition = "2021"
 license = "MIT"
 description = "Packet-level DPI desync engine for Gust (WinDivert)"
 
+[dependencies]
+aes = "0.8"
+aes-gcm = { version = "0.10", default-features = false, features = ["aes", "alloc"] }
+hkdf = "0.12"
+sha2 = "0.10"
+
 [[bin]]
 name = "gust-engine"
 path = "src/main.rs"

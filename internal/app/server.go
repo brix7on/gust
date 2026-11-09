@@ -170,6 +170,7 @@ type settingsIn struct {
 	DiscordDirect   *bool           `json:"discord_direct"`
 	Groups          map[string]bool `json:"groups"`
 	Lang            *string         `json:"lang"`
+	Engine          *string         `json:"engine"`
 }
 
 func (a *App) handleSettings(r *http.Request) error {
@@ -193,6 +194,9 @@ func (a *App) handleSettings(r *http.Request) error {
 		}
 		if in.AutoStartBypass != nil {
 			s.AutoStartBypass = *in.AutoStartBypass
+		}
+		if in.Engine != nil && (*in.Engine == "zapret" || *in.Engine == "gust" || *in.Engine == "both") {
+			s.Engine = *in.Engine
 		}
 		if in.Lang != nil && (*in.Lang == "auto" || *in.Lang == "ru" || *in.Lang == "en") {
 			s.Lang = *in.Lang
@@ -234,6 +238,7 @@ type stateOut struct {
 	Discord    discordOut  `json:"discord"`
 	Log        []string    `json:"log"`
 	Services   []Service   `json:"services"`
+	EngineOK   bool        `json:"engine_available"`
 }
 
 func (a *App) handleState(w http.ResponseWriter, r *http.Request) {
@@ -269,5 +274,6 @@ func (a *App) handleState(w http.ResponseWriter, r *http.Request) {
 	out.Discord = a.discordState(tuning)
 	out.Log = a.logTail(80)
 	out.Services = services
+	out.EngineOK = a.engineExe() != ""
 	writeJSON(w, out)
 }
