@@ -25,6 +25,9 @@ const OP_CLOSE: u8 = 0x8;
 const OP_PING: u8 = 0x9;
 const OP_PONG: u8 = 0xA;
 const MAX_WS_MESSAGE: usize = 16 << 20;
+const TCP_TRIES: usize = 3;
+const TCP_STAGGER: Duration = Duration::from_millis(1200);
+const TCP_LAST: Duration = Duration::from_secs(3);
 
 #[derive(Debug)]
 pub enum DialError {
@@ -169,11 +172,7 @@ pub async fn dial_ws(o: DialOpts) -> Result<WsConn, DialError> {
 }
 
 async fn dial_inner(o: &DialOpts, set: &(dyn Fn(&'static str) + Sync)) -> Result<WsConn, DialError> {
-    let raw = match &o.dial {
-        Some(d) => d.connect(&o.addr).await,
-        None => TcpStream::connect(&o.addr).await,
-    }
-    .map_err(|e| DialError::Stage("TCP", io_reason(&e)))?;
+    let raw = tcp_race(o).await.map_err(|e| DialError::Stage("TCP", io_reason(&e)))?;
     let _ = raw.set_nodelay(true);
 
     set("TLS");
@@ -217,6 +216,34 @@ async fn dial_inner(o: &DialOpts, set: &(dyn Fn(&'static str) + Sync)) -> Result
         closed: AtomicBool::new(false),
         created: Instant::now(),
     })
+}
+
+// Staggered TCP attempts: a dropped SYN costs one stagger, not the whole timeout.
+async fn tcp_race(o: &DialOpts) -> io::Result<TcpStream> {
+    let mut set = tokio::task::JoinSet::new();
+    let mut started = 0;
+    let mut last = io::Error::from(io::ErrorKind::TimedOut);
+    loop {
+        if started < TCP_TRIES {
+            started += 1;
+            let (dial, addr) = (o.dial.clone(), o.addr.clone());
+            set.spawn(async move {
+                match dial {
+                    Some(d) => d.connect(&addr).await,
+                    None => TcpStream::connect(&addr).await,
+                }
+            });
+        }
+        let wait = if started < TCP_TRIES { TCP_STAGGER } else { TCP_LAST };
+        match tokio::time::timeout(wait, set.join_next()).await {
+            Ok(Some(Ok(Ok(s)))) => return Ok(s),
+            Ok(Some(Ok(Err(e)))) => last = e,
+            Ok(Some(Err(_))) => {}
+            Ok(None) => return Err(last),
+            Err(_) if started >= TCP_TRIES => return Err(io::Error::from(io::ErrorKind::TimedOut)),
+            Err(_) => {}
+        }
+    }
 }
 
 pub fn base64(b: &[u8]) -> String {

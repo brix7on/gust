@@ -1,6 +1,6 @@
 // Pool of ready WebSockets per DC: a new Telegram connection gets an open channel without a TLS delay.
 
-use super::ws::{dial_ws, DialOpts, WsConn};
+use super::ws::{dial_ws, DialError, DialOpts, WsConn};
 use super::Shared;
 use std::collections::{HashMap, VecDeque};
 use std::fmt;
@@ -14,6 +14,7 @@ const POOL_MAX_AGE: Duration = Duration::from_secs(120);
 const POOL_TICK: Duration = Duration::from_secs(5);
 const REFILL_MIN_GAP: Duration = Duration::from_secs(1);
 const REFILL_MAX_GAP: Duration = Duration::from_secs(15);
+const OK_FRESH: Duration = Duration::from_secs(180);
 const FRONTING_SNI: &str = "sprinthost.ru";
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
@@ -84,7 +85,8 @@ fn close_later(ws: Arc<WsConn>) {
 impl Pool {
     pub fn direct_status(&self) -> (Option<SystemTime>, String) {
         let g = self.inner.lock().unwrap();
-        (g.last_ok, g.last_err.clone())
+        let fresh = g.last_ok.is_some_and(|t| t.elapsed().is_ok_and(|d| d < OK_FRESH));
+        (g.last_ok, if fresh { String::new() } else { g.last_err.clone() })
     }
 
     pub fn backed_off(&self, k: PoolKey) -> bool {
@@ -195,6 +197,9 @@ pub async fn connect(sh: &Arc<Shared>, ip: &str, k: PoolKey) -> Option<Arc<WsCon
                 Err(e) => {
                     sh.st.ws_errors.fetch_add(1, Relaxed);
                     sh.pool.inner.lock().unwrap().last_err = e.short();
+                    if matches!(e, DialError::Stage("TCP", _)) {
+                        return None;
+                    }
                 }
                 Ok(w) => {
                     let first = {
