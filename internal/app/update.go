@@ -109,6 +109,7 @@ func (a *App) updateLoop() {
 	time.Sleep(20 * time.Second)
 	for {
 		a.checkUpdate()
+		a.fetchStrategies()
 		select {
 		case <-a.quit:
 			return

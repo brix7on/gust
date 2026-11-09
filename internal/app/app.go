@@ -118,6 +118,7 @@ func newApp(dataDir string, port int) *App {
 	}
 	a.openLog()
 	a.loadSettings()
+	a.loadCachedStrategies()
 	a.pages = newPageHub()
 	a.eng = newEngine(a)
 	return a

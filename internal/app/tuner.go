@@ -240,6 +240,16 @@ func (a *App) startSelected() error {
 			pick, found = s, true
 		}
 	}
+	if !found {
+		if k := guKey(sel); k != "" {
+			for _, s := range strats {
+				if guKey(s.Name) == k {
+					pick = s
+					break
+				}
+			}
+		}
+	}
 	if err := a.eng.Start(pick, true); err != nil {
 		return err
 	}

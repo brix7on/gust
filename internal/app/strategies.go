@@ -147,7 +147,7 @@ func builtinStrategies(root, exe string) []Strategy {
 
 	var out []Strategy
 	n := 0
-	for _, v := range tcpVariants {
+	for _, v := range currentTCP() {
 		if (v.needs == "G" && g == "") || (v.needs == "Y" && y == "") {
 			continue
 		}
