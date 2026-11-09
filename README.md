@@ -1,98 +1,75 @@
+<a id="english"></a>
+
 # Gust
 
-Обход DPI-блокировок Discord, YouTube и других сервисов на Windows. Обёртка над
-[zapret](https://github.com/Flowseal/zapret-discord-youtube) (движок `winws` + драйвер WinDivert)
-со встроенным прокси для Telegram.
+**English** · [Русский](#russian)
 
-**[Скачать последнюю версию](../../releases/latest)** — распакуйте и запустите `Gust.exe`.
+DPI bypass for Discord, YouTube and other services on Windows. A single executable with a built-in interface: no installation, picks a working strategy automatically and keeps it working.
 
-- Автоподбор рабочей стратегии и переподбор при сбое
-- Встроенный MTProto-прокси для Telegram (WebSocket)
-- Дополнительные сервисы: Roblox, Instagram, X, WhatsApp, Twitch и другие — включаются галочкой
-- Интерфейс на русском и английском, язык берётся из Windows
-- Один exe без установки, автозапуск с Windows
+## Quick start
 
-> English: DPI bypass for Discord, YouTube and more on Windows, built on zapret, with a built-in
-> Telegram proxy. Download the latest release, unpack and run `Gust.exe`. The UI follows the Windows language.
+1. Download `Gust-…-windows-x64.zip` from [Releases](../../releases/latest).
+2. Unpack it and run `Gust.exe`. Accept the administrator prompt: the WinDivert driver requires it.
+3. Click **Download components**. Gust fetches the zapret build once and tunes a strategy on its own.
 
-## Структура
+## How it works
 
-```
-cmd/gust/        точка входа: разбор флагов → app.Run
-internal/app/          вся логика
-  run.go               запуск: права, папка данных, веб-сервер, автозапуск
-  app.go               состояние, настройки, журнал
-  engine.go            управление процессом winws (запуск, watchdog, остановка)
-  zapret.go            разбор .bat сборки, скачивание/распаковка, безопасность путей
-  strategies.go        собственные стратегии GU-xx
-  tuner.go             проверка доступности и автоподбор
-  server.go            HTTP-API и выдача страницы
-  tg.go                встроенный прокси Telegram: запуск, секрет, ссылка tg://proxy
-  pages.go             открытые вкладки: повторный запуск обновляет страницу, а не открывает новую
-  discord.go           вкладка Discord: свои проверки, переключение для голоса, перезапуск клиента
-  ui.go                окно интерфейса: открыть/вывести вперёд, запасной путь через браузер
-  ui.html              интерфейс (встраивается в exe)
-internal/tgproxy/      MTProto-прокси для Telegram через WebSocket (перенос tg-ws-proxy)
-  obfs.go              рукопожатие и перешифровка (AES-CTR)
-  ws.go                минимальный WebSocket-клиент поверх TLS
-  pool.go              пул готовых WS к дата-центрам
-  splitter.go          нарезка потока на пакеты MTProto (кадр WS = пакет)
-internal/platform/     всё, что зависит от Windows (права, процессы, WinDivert, автозапуск)
-  gui_windows.go       окно WebView2 (процесс --window), значок в трее, вывод окна вперёд
-  child.go             дочерний процесс-окно: жив ли, код выхода
-```
+1. **Bypass.** Traffic is processed by `winws` from [zapret](https://github.com/bol-van/zapret) with the [zapret-discord-youtube](https://github.com/Flowseal/zapret-discord-youtube) build. Gust tries the build's strategies plus its own `GU-xx` set and keeps the one under which the most services open.
+2. **Monitoring.** Services are checked in the background. When access degrades, Gust re-tunes automatically.
+3. **Telegram.** Telegram is restricted by IP, so `winws` can't help it. Gust runs a local MTProto proxy that tunnels traffic over WebSocket to Telegram's web endpoints. One click connects Telegram Desktop. Encryption is preserved.
+4. **Discord.** Separate checks, switching strategies for voice, launching Discord outside a proxy-mode VPN, and restarting a stuck client.
 
-Не-Windows сборка компилируется (platform-заглушки) — это нужно для тестов; в бою работает только Windows.
+Discord and YouTube are checked by default. Roblox, Instagram, Facebook, X, WhatsApp, Signal, Viber, Snapchat, LinkedIn, Twitch, SoundCloud, Patreon, Medium, Steam Community, RuTracker, NNM-Club, Tor Project, Proton and Telegram web can be enabled in the **More** tab: their domains are added to the bypass list automatically.
 
-## Окно и трей
+The interface is available in English and Russian. The language follows Windows and can be changed in Settings.
 
-Интерфейс открывается во встроенном окне (WebView2, библиотека `go-webview2`), а не во вкладке браузера.
-Окно — отдельный процесс: та же программа с ключом `--window` (служебный, руками не нужен). Если WebView2 упадёт —
-обход не заденет. Закрыли окно — программа остаётся в трее (щелчок или «Открыть Gust» — открыть снова,
-«Выход» — выйти и выключить обход). При автозапуске (`--background`) окна нет, только значок в трее.
-Нет WebView2 на ПК или окно не запустилось — интерфейс открывается в браузере по умолчанию (запись в журнале).
+## Data and startup
 
-Зависимости: `go-webview2` и `go-winloader` (MIT). `golang.org/x/sys` подменён зеркалом `github.com/golang/sys` (директива
-`replace` в `go.mod`) — на случай, если `golang.org` недоступен при сборке. Контрольные суммы в `go.sum` записаны без
-проверки через sum.golang.org — при первой сборке на обычной машине стоит выполнить `go mod verify` и сверить `go.sum`.
+Settings, the zapret build and the log are kept in `C:\ProgramData\Gust`, accessible only to administrators and SYSTEM. **Start with Windows** creates a scheduled task, so there is no elevation prompt at sign-in. Closing the window keeps Gust in the tray; **Quit** disables the bypass.
 
-## Сборка и тесты
+## Building from source
 
-```sh
-./build.sh            # тесты с -race + exe под Windows в dist/
-```
+Requires Go 1.24+. Run `./build.sh`: tests with the race detector, then `dist/Gust.exe`. Details are in [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
 
-Вручную:
+## Disclaimer
 
-```sh
-go test -race ./...
-# значок exe: cmd/gust/rsrc_windows_amd64.syso (из cmd/gust/gust.ico, утилита rsrc)
-GOOS=windows GOARCH=amd64 go build -trimpath -ldflags "-H=windowsgui -s -w" -o dist/Gust.exe ./cmd/gust
-```
+Some services are blocked by IP, and DPI bypass can't help those. Use the tool in accordance with the laws of your country. Provided as is, without warranty. License: MIT, third-party code: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
-## Безопасность
+---
 
-- Папка данных (`C:\ProgramData\Gust`) закрывается ACL только для админов и SYSTEM —
-  из неё запускаются exe с повышенными правами, обычный пользователь не подменит файл и не подложит DLL.
-- Запускается только `winws.exe` из папки сборки; подменённый `.bat` с чужим exe отклоняется.
-- Локальный API защищён токеном (сверка в постоянное время) и проверкой заголовка Host (против DNS-rebinding).
-- Скачивание — только с github.com и его CDN; распаковка защищена от zip-slip и zip-бомбы.
+<a id="russian"></a>
 
-### Известные ограничения
+# Gust
 
-- Окно интерфейса (процесс-потомок) наследует права администратора — как и сама программа (UAC-перезапуск под WinDivert).
-  Показывает оно только `http://127.0.0.1:…` (другой адрес отклоняется), внешние ссылки открываются в браузере по умолчанию
-  и только если это `https`.
-- Голос Discord (UDP) автоматически не проверяется — только сайты и API.
-- Telegram через `winws` не обходится (блокировка по IP) — для него встроенный прокси:
-  Telegram Desktop → 127.0.0.1:1443 (MTProto, dd-секрет) → WebSocket `kwsN.web.telegram.org/apiws`
-  на 149.154.167.220 → запасной путь — прямой TCP.
-  Без HTTP/2-канала для медиа, который есть в оригинале.
+[English](#english) · **Русский**
 
-## Сторонний код
+Обход DPI-блокировок Discord, YouTube и других сервисов в Windows. Один исполняемый файл со встроенным интерфейсом: без установки, сам подбирает рабочую стратегию и следит, чтобы она не переставала работать.
 
-Прокси Telegram — перенос на Go проекта tg-ws-proxy (Flowseal, MIT). Подробнее — `THIRD_PARTY_NOTICES.md`.
+## Быстрый старт
 
-## Лицензия
+1. Скачайте `Gust-…-windows-x64.zip` из [Releases](../../releases/latest).
+2. Распакуйте и запустите `Gust.exe`. Согласитесь на запрос прав администратора: они нужны драйверу WinDivert.
+3. Нажмите **Загрузить компоненты**. Gust один раз скачает сборку zapret и сам подберёт стратегию.
 
-MIT — см. `LICENSE`. Сторонний код — `THIRD_PARTY_NOTICES.md`.
+## Как это работает
+
+1. **Обход.** Трафик обрабатывает `winws` из [zapret](https://github.com/bol-van/zapret) со сборкой [zapret-discord-youtube](https://github.com/Flowseal/zapret-discord-youtube). Gust перебирает стратегии сборки и собственный набор `GU-xx` и оставляет ту, при которой открывается больше всего сервисов.
+2. **Контроль.** Сервисы проверяются в фоне. Если доступ пропадает, Gust подбирает стратегию заново.
+3. **Telegram.** Telegram ограничен по IP, поэтому `winws` ему не помогает. Gust поднимает локальный MTProto-прокси, который ведёт трафик через WebSocket на веб-адреса Telegram. Telegram Desktop подключается одной кнопкой. Шифрование сохраняется.
+4. **Discord.** Отдельные проверки, смена стратегии для голоса, запуск Discord в обход VPN в режиме прокси и перезапуск зависшего клиента.
+
+По умолчанию проверяются Discord и YouTube. Roblox, Instagram, Facebook, X, WhatsApp, Signal, Viber, Snapchat, LinkedIn, Twitch, SoundCloud, Patreon, Medium, Steam Community, RuTracker, NNM-Club, Tor Project, Proton и сайт Telegram включаются во вкладке **Прочее**: их домены автоматически добавляются в список обхода.
+
+Интерфейс доступен на русском и английском. Язык берётся из Windows и меняется в настройках.
+
+## Данные и автозапуск
+
+Настройки, сборка zapret и журнал хранятся в `C:\ProgramData\Gust`, доступ только у администраторов и SYSTEM. **Автозапуск с Windows** создаёт задачу планировщика, поэтому при входе запрос прав не появляется. Закрытое окно оставляет Gust в трее; **Выйти** отключает обход.
+
+## Сборка из исходников
+
+Нужен Go 1.24+. Команда `./build.sh`: тесты с детектором гонок, затем `dist/Gust.exe`. Подробности — в [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
+
+## Отказ от ответственности
+
+Часть сервисов заблокирована по IP, и обход DPI им не поможет. Используйте программу в соответствии с законами своей страны. Предоставляется «как есть», без гарантий. Лицензия: MIT, сторонний код: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
