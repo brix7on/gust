@@ -14,6 +14,7 @@ func main() {
 	flag.BoolVar(&opt.Background, "background", false, "не открывать окно при запуске, только значок в трее (для автозапуска)")
 	flag.BoolVar(&opt.NoAdmin, "no-admin", false, "не требовать права администратора (для отладки)")
 	flag.BoolVar(&opt.AfterUpdate, "after-update", false, "служебный: запуск после самообновления")
+	flag.BoolVar(&opt.Portable, "portable", false, "запускаться с текущего места, не переносить exe в «Загрузки»")
 	flag.IntVar(&opt.Port, "port", app.DefaultPort, "порт локального интерфейса")
 	flag.StringVar(&opt.DataDir, "data", app.DefaultDataDir(), "папка с данными")
 	// служебные ключи: эта же программа, запущенная как окно интерфейса (его открывает основная копия)

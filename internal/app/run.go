@@ -21,6 +21,7 @@ type Options struct {
 	Background  bool
 	NoAdmin     bool
 	AfterUpdate bool
+	Portable    bool
 }
 
 // DefaultDataDir — папка данных по умолчанию. На Windows это ASCII-путь без пробелов и
@@ -42,6 +43,9 @@ func DefaultDataDir() string {
 
 // Run поднимает приложение: права, папка данных, локальный веб-интерфейс, автозапуск обхода.
 func Run(opt Options) {
+	if !opt.Portable && !opt.AfterUpdate && moveHome() {
+		return
+	}
 	addr := fmt.Sprintf("127.0.0.1:%d", opt.Port)
 	if opt.AfterUpdate {
 		waitPortFree(addr, 20*time.Second)
