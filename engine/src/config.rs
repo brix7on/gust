@@ -311,6 +311,8 @@ fn hostfake_mod(p: &mut Plan, v: &str) -> Result<(), String> {
     for x in v.split(',').map(str::trim).filter(|x| !x.is_empty()) {
         match x.split_once('=') {
             Some(("host", h)) if !h.is_empty() => p.fake_host = Some(h.to_ascii_lowercase()),
+            Some(("altorder", "0")) => p.altorder = false,
+            Some(("altorder", "1")) => p.altorder = true,
             _ => return Err(format!("unsupported hostfakesplit mod: {x}")),
         }
     }

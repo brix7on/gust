@@ -122,6 +122,7 @@ pub struct Plan {
     pub faked_pattern: Vec<u8>,
     pub fake_host: Option<String>,
     pub midhost: Option<Pos>,
+    pub altorder: bool,
 }
 
 impl Default for Plan {
@@ -134,6 +135,7 @@ impl Default for Plan {
             faked_pattern: vec![0],
             fake_host: None,
             midhost: None,
+            altorder: false,
         }
     }
 }
@@ -272,7 +274,9 @@ impl Plan {
                     fake: true,
                 };
                 real(&mut out, data, 0, hs, mss);
-                out.push(fh.clone());
+                if !self.altorder {
+                    out.push(fh.clone());
+                }
                 let mid = self
                     .midhost
                     .and_then(|p| p.resolve(c))
