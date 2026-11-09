@@ -17,6 +17,7 @@ import (
 var engineFS embed.FS
 
 const engineName = "gust-engine.exe"
+const tgImage = "gust-tg.exe"
 
 // TwinPrefix — приставка к имени стратегии, запущенной через собственный движок.
 const TwinPrefix = "Gust · "
@@ -60,13 +61,25 @@ func (a *App) engineExe() string {
 	return a.enginePath
 }
 
-func (a *App) extractEngine() string {
+// tgExe — копия движка под другим именем для прокси Telegram: так «снять gust-engine.exe»
+// (смена стратегии, выход) не убивает прокси.
+func (a *App) tgExe() string {
+	if engineOverride != "" {
+		return engineOverride
+	}
+	a.tgOnce.Do(func() { a.tgPath = a.extractAs(tgImage) })
+	return a.tgPath
+}
+
+func (a *App) extractEngine() string { return a.extractAs(engineName) }
+
+func (a *App) extractAs(name string) string {
 	b, err := engineFS.ReadFile("enginebin/" + engineName)
 	if err != nil || len(b) == 0 {
 		return ""
 	}
 	dir := filepath.Join(a.dataDir, "engine")
-	p := filepath.Join(dir, engineName)
+	p := filepath.Join(dir, name)
 	if old, err := os.ReadFile(p); err == nil && bytes.Equal(old, b) {
 		return p
 	}
@@ -80,7 +93,7 @@ func (a *App) extractEngine() string {
 		return ""
 	}
 	if err := os.Rename(tmp, p); err != nil {
-		platform.KillByName(engineName)
+		platform.KillByName(name)
 		time.Sleep(300 * time.Millisecond)
 		if err := os.Rename(tmp, p); err != nil {
 			_ = os.Remove(tmp)

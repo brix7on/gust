@@ -2,7 +2,7 @@
 
 ## tg-ws-proxy
 
-`internal/tgproxy` — перенос на Go логики проекта [tg-ws-proxy](https://github.com/Flowseal/tg-ws-proxy)
+`engine/src/tg` — перенос на Rust логики проекта [tg-ws-proxy](https://github.com/Flowseal/tg-ws-proxy)
 (обфускация MTProto, перешифровка, пул WebSocket, запасной путь через TCP).
 
 ```

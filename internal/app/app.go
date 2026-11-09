@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"gust/internal/platform"
-	"gust/internal/tgproxy"
 	"os"
 	"path/filepath"
 	"sync"
@@ -81,6 +80,8 @@ type App struct {
 	skipLogged sync.Map // имена .bat, про которые уже написали в журнал
 	engOnce    sync.Once
 	enginePath string
+	tgOnce     sync.Once
+	tgPath     string
 
 	mu         sync.Mutex
 	set        Settings
@@ -103,7 +104,7 @@ type App struct {
 	uiBrowserOnly bool            // окно на этом ПК не запускается — дальше только браузер
 
 	tgMu  sync.Mutex
-	tgs   *tgproxy.Server
+	tgs   *tgRun
 	tgErr string
 }
 

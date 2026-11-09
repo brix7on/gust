@@ -1,20 +1,26 @@
 package app
 
 import (
+	"bufio"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"gust/internal/platform"
 	"gust/internal/tgproxy"
+	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
-	"syscall"
+	"strconv"
+	"strings"
+	"sync"
+	"sync/atomic"
 	"time"
 )
 
 // Telegram режут по IP дата-центров, поэтому winws ему не помогает.
-// Встроенный прокси (internal/tgproxy) уводит трафик в WebSocket к kwsN.web.telegram.org.
+// Встроенный прокси (engine/src/tg, Rust) уводит трафик в WebSocket к kwsN.web.telegram.org.
 
 const oldTGImage = "TgWsProxy_windows.exe" // отдельная программа, которую мы раньше скачивали
 
@@ -62,32 +68,130 @@ func oldTGSecret() string {
 	return c.Secret
 }
 
+// tgRun — запущенный процесс прокси (gust-tg.exe tgproxy): строки его вывода — «ready», «error: …», «log: …», «stats: {json}».
+type tgRun struct {
+	cmd      *exec.Cmd
+	stdin    io.WriteCloser
+	done     chan struct{}
+	stopping atomic.Bool
+
+	mu    sync.Mutex
+	stats tgproxy.StatsSnapshot
+}
+
+func (r *tgRun) snapshot() tgproxy.StatsSnapshot {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.stats
+}
+
+func (r *tgRun) stop() {
+	r.stopping.Store(true)
+	_ = r.stdin.Close()
+	if r.cmd.Process != nil {
+		_ = r.cmd.Process.Kill()
+	}
+	select {
+	case <-r.done:
+	case <-time.After(3 * time.Second):
+	}
+}
+
 func (a *App) tgStart() error {
 	a.tgMu.Lock()
 	defer a.tgMu.Unlock()
 	if a.tgs != nil {
 		return nil
 	}
-	s, err := tgproxy.Start(tgproxy.Config{
-		Port:     tgproxy.DefaultPort,
-		Secret:   a.tgSecret(),
-		PoolSize: 4,
-		Logf:     a.logf,
-	})
+	exe := a.tgExe()
+	if exe == "" {
+		err := errors.New("в этой сборке нет встроенного движка — прокси Telegram недоступен")
+		a.tgErr = err.Error()
+		a.logf("Telegram-прокси: %v", err)
+		return err
+	}
+	cmd := exec.Command(exe, "tgproxy", "--port", strconv.Itoa(tgproxy.DefaultPort), "--secret", a.tgSecret(), "--pool", "4")
+	cmd.Dir = filepath.Dir(exe)
+	platform.HideWindow(cmd)
+	stdin, err := cmd.StdinPipe() // закроется вместе с нами — прокси сам завершится
 	if err != nil {
+		return err
+	}
+	out, err := cmd.StdoutPipe()
+	if err != nil {
+		return err
+	}
+	if err := cmd.Start(); err != nil {
+		a.tgErr = err.Error()
+		a.logf("Telegram-прокси: %v", err)
+		return err
+	}
+	r := &tgRun{cmd: cmd, stdin: stdin, done: make(chan struct{})}
+	first := make(chan error, 1)
+	go func() {
+		sc := bufio.NewScanner(out)
+		sc.Buffer(make([]byte, 64<<10), 1<<20)
+		for sc.Scan() {
+			line := sc.Text()
+			switch {
+			case line == "ready":
+				select {
+				case first <- nil:
+				default:
+				}
+			case strings.HasPrefix(line, "error: "):
+				select {
+				case first <- errors.New(strings.TrimPrefix(line, "error: ")):
+				default:
+				}
+			case strings.HasPrefix(line, "log: "):
+				a.logf("%s", strings.TrimPrefix(line, "log: "))
+			case strings.HasPrefix(line, "stats: "):
+				var st tgproxy.StatsSnapshot
+				if json.Unmarshal([]byte(strings.TrimPrefix(line, "stats: ")), &st) == nil {
+					r.mu.Lock()
+					r.stats = st
+					r.mu.Unlock()
+				}
+			}
+		}
+		_ = cmd.Wait()
+		close(r.done)
+		if r.stopping.Load() {
+			return
+		}
+		select {
+		case first <- errors.New("процесс прокси завершился"):
+		default:
+		}
+		a.tgMu.Lock()
+		if a.tgs == r {
+			a.tgs, a.tgErr = nil, "процесс прокси неожиданно завершился"
+			a.logf("Telegram-прокси: процесс неожиданно завершился")
+		}
+		a.tgMu.Unlock()
+	}()
+
+	select {
+	case err = <-first:
+	case <-time.After(10 * time.Second):
+		err = errors.New("прокси не запустился за 10 секунд")
+	}
+	if err != nil {
+		r.stop()
 		err = friendlyListenErr(err)
 		a.tgErr = err.Error()
 		a.logf("Telegram-прокси: %v", err)
 		return err
 	}
-	a.tgs, a.tgErr = s, ""
+	a.tgs, a.tgErr = r, ""
 	a.updateSettings(func(st *Settings) { st.TGEnabled = true })
 	a.logf("Telegram-прокси запущен на 127.0.0.1:%d", tgproxy.DefaultPort)
 	return nil
 }
 
 func friendlyListenErr(err error) error {
-	if errors.Is(err, syscall.EADDRINUSE) || errors.Is(err, syscall.Errno(10048)) { // WSAEADDRINUSE
+	if err.Error() == "addr_in_use" {
 		if runtime.GOOS == "windows" && platform.ProcRunning(oldTGImage) {
 			return fmt.Errorf("порт %d занят старым TG WS Proxy. Закройте его (значок у часов → «Выход»): он больше не нужен", tgproxy.DefaultPort)
 		}
@@ -103,7 +207,7 @@ func (a *App) tgStop(remember bool) {
 	a.tgs = nil
 	a.tgMu.Unlock()
 	if s != nil {
-		s.Stop()
+		s.stop()
 		a.logf("Telegram-прокси остановлен")
 	}
 	if remember {
@@ -130,7 +234,7 @@ func (a *App) tgState(stale bool) tgOut {
 	a.tgMu.Unlock()
 	out.Link = tgproxy.Link(tgproxy.DefaultPort, a.settings().TGSecret)
 	if s != nil {
-		out.Stats = s.Stats()
+		out.Stats = s.snapshot()
 	} else if runtime.GOOS == "windows" {
 		out.OldProxy = a.cachedBool("oldtg", 10*time.Second, stale, func() bool { return platform.ProcRunning(oldTGImage) })
 	}

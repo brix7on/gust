@@ -11,6 +11,7 @@ mod l7;
 mod packet;
 mod quic;
 mod rng;
+mod tg;
 mod tls;
 
 use std::process::exit;
@@ -36,6 +37,9 @@ desync:   --dpi-desync=[fake,][syndata,]multisplit|multidisorder|fakedsplit|fake
 
 fn main() {
     let mut args: Vec<String> = std::env::args().skip(1).collect();
+    if args.first().map(String::as_str) == Some("tgproxy") {
+        exit(tg::run_cli(&args[1..]));
+    }
     if args.iter().any(|a| a == "-h" || a == "--help") {
         println!("{USAGE}");
         return;

@@ -12,16 +12,12 @@ internal/app/          вся логика
   strategies.go        собственные стратегии GU-xx
   tuner.go             проверка доступности и автоподбор
   server.go            HTTP-API и выдача страницы
-  tg.go                встроенный прокси Telegram: запуск, секрет, ссылка tg://proxy
+  tg.go                встроенный прокси Telegram: запуск процесса gust-tg.exe tgproxy, секрет, ссылка tg://proxy, счётчики
   pages.go             открытые вкладки: повторный запуск обновляет страницу, а не открывает новую
   discord.go           вкладка Discord: свои проверки, переключение для голоса, перезапуск клиента
   ui.go                окно интерфейса: открыть/вывести вперёд, запасной путь через браузер
   ui.html              интерфейс (встраивается в exe)
-internal/tgproxy/      MTProto-прокси для Telegram через WebSocket (перенос tg-ws-proxy)
-  obfs.go              рукопожатие и перешифровка (AES-CTR)
-  ws.go                минимальный WebSocket-клиент поверх TLS
-  pool.go              пул готовых WS к дата-центрам
-  splitter.go          нарезка потока на пакеты MTProto (кадр WS = пакет)
+internal/tgproxy/      общее для прокси Telegram: порт, секрет, ссылка tg://proxy, формат счётчиков
 internal/platform/     всё, что зависит от Windows (права, процессы, WinDivert, автозапуск)
   gui_windows.go       окно WebView2 (процесс --window), значок в трее, вывод окна вперёд
   child.go             дочерний процесс-окно: жив ли, код выхода
@@ -91,6 +87,13 @@ GOOS=windows GOARCH=amd64 go build -trimpath -ldflags "-H=windowsgui -s -w" -o d
   фейк без рабочего fooling не отправляется (иначе он дошёл бы до сервера);
 - UDP: расшифровка QUIC Initial v1/v2 (RFC 9001/9369, проверено на эталонных векторах) ради SNI, склейка CRYPTO из
   двух датаграмм, Discord IP Discovery и STUN, `any-protocol` и `cutoff`, ipset (CIDR, IPv4/IPv6).
+
+Тот же бинарник умеет работать прокси Telegram: `gust-engine tgproxy --port 1443 --secret HEX --pool 4`
+(`engine/src/tg`: obfs — рукопожатие и AES-CTR, splitter — нарезка потока на пакеты, ws — WebSocket поверх TLS на rustls,
+pool — пул готовых соединений, mod — приёмник, мост и запасной TCP). Строки вывода: `ready`, `error: …`, `log: …`,
+`stats: {json}`; закрылся stdin — процесс завершается. Совместимость шифрования с прежней Go-версией закреплена
+тестом `matches_go_vector` (`engine/src/tg/vector.json`). Go запускает его из копии `gust-tg.exe`, чтобы остановка
+`gust-engine.exe` не трогала прокси.
 
 Gust вшивает движок в exe (`internal/app/enginebin`, go:embed), распаковывает в `C:\ProgramData\Gust\engine` и строит
 для каждой стратегии двойника «Gust · имя». Настройка «Движок обхода»: zapret / Gust / оба.
