@@ -15,6 +15,8 @@ const POOL_TICK: Duration = Duration::from_secs(5);
 const REFILL_MIN_GAP: Duration = Duration::from_secs(1);
 const REFILL_MAX_GAP: Duration = Duration::from_secs(15);
 const OK_FRESH: Duration = Duration::from_secs(180);
+const WARM_DCS: [i32; 2] = [2, 4];
+const ALT_FRONT: &str = "149.154.167.99";
 const FRONTING_SNI: &str = "sprinthost.ru";
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
@@ -179,6 +181,19 @@ pub async fn connect(sh: &Arc<Shared>, ip: &str, k: PoolKey) -> Option<Arc<WsCon
     if ip.is_empty() {
         return None;
     }
+    let mut ips = vec![ip.to_string()];
+    if ip != ALT_FRONT {
+        ips.push(ALT_FRONT.to_string());
+    }
+    for ip in ips {
+        if let Some(w) = connect_ip(sh, &ip, k).await {
+            return Some(w);
+        }
+    }
+    None
+}
+
+async fn connect_ip(sh: &Arc<Shared>, ip: &str, k: PoolKey) -> Option<Arc<WsConn>> {
     let path = if k.test { WS_PATH_TEST } else { WS_PATH };
     let modes: [bool; 2] = if sh.pool.inner.lock().unwrap().front_first { [true, false] } else { [false, true] };
     for dom in ws_domains(k.dc, k.media) {
@@ -253,7 +268,7 @@ pub async fn maintain(sh: Arc<Shared>) {
 }
 
 pub fn warmup(sh: &Arc<Shared>) {
-    for dc in sh.cfg.dc_redirects.keys() {
+    for dc in sh.cfg.dc_redirects.keys().filter(|d| WARM_DCS.contains(d)) {
         for media in [false, true] {
             refill(sh, PoolKey { dc: *dc, media, test: false });
         }
