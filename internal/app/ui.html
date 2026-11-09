@@ -635,7 +635,7 @@ function render() {
   }
   if (document.activeElement !== $("oLang")) $("oLang").value = s.settings.lang || "auto";
   $("engRow").style.display = s.engine_available ? "" : "none";
-  if (document.activeElement !== $("oEngine")) $("oEngine").value = s.settings.engine || "zapret";
+  if (document.activeElement !== $("oEngine")) $("oEngine").value = s.settings.engine || "gust";
   document.querySelectorAll("[data-g]").forEach(c => { if (document.activeElement !== c) c.checked = !!s.settings.groups[c.dataset.g]; });
 
   // discord

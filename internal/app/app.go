@@ -25,6 +25,7 @@ type Settings struct {
 	LastTune        int64           `json:"last_tune"`
 	Lang            string          `json:"lang"`        // auto, ru, en
 	Engine          string          `json:"engine"`      // zapret, gust, both
+	EnginePicked    bool            `json:"engine_picked"`
 	AddedHosts      []string        `json:"added_hosts"` // домены, которые программа сама дописала в list-general-user.txt
 }
 
@@ -34,7 +35,7 @@ func defaultSettings() Settings {
 		ExtraStrategies: true,
 		AutoStartBypass: true,
 		Lang:            "auto",
-		Engine:          "zapret",
+		Engine:          "gust",
 		Groups:          fillGroups(nil),
 	}
 }
@@ -200,8 +201,8 @@ func (a *App) loadSettings() {
 		return
 	}
 	s.Groups = fillGroups(s.Groups)
-	if s.Engine != "gust" && s.Engine != "both" {
-		s.Engine = "zapret"
+	if !s.EnginePicked || (s.Engine != "zapret" && s.Engine != "both") {
+		s.Engine = "gust"
 	}
 	a.set = s
 }

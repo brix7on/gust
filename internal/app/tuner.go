@@ -224,9 +224,20 @@ func (a *App) startSelected() error {
 	}
 	sel := a.settings().Selected
 	pick := strats[0]
+	alt := strings.TrimPrefix(sel, TwinPrefix)
+	if alt == sel {
+		alt = TwinPrefix + sel
+	}
+	found := false
 	for _, s := range strats {
 		if s.Name == sel {
-			pick = s
+			pick, found = s, true
+			break
+		}
+	}
+	for _, s := range strats {
+		if !found && s.Name == alt {
+			pick, found = s, true
 		}
 	}
 	if err := a.eng.Start(pick, true); err != nil {

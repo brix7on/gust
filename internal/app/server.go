@@ -197,6 +197,7 @@ func (a *App) handleSettings(r *http.Request) error {
 		}
 		if in.Engine != nil && (*in.Engine == "zapret" || *in.Engine == "gust" || *in.Engine == "both") {
 			s.Engine = *in.Engine
+			s.EnginePicked = true
 		}
 		if in.Lang != nil && (*in.Lang == "auto" || *in.Lang == "ru" || *in.Lang == "en") {
 			s.Lang = *in.Lang
