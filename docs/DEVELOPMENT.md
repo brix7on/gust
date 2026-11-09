@@ -3,52 +3,47 @@
 ## Структура
 
 ```
-cmd/gust/        точка входа: разбор флагов → app.Run
-internal/app/          вся логика
-  run.go               запуск: права, папка данных, веб-сервер, автозапуск
-  app.go               состояние, настройки, журнал
-  engine.go            управление процессом winws (запуск, watchdog, остановка)
-  zapret.go            разбор .bat сборки, скачивание/распаковка, безопасность путей
-  strategies.go        собственные стратегии GU-xx
-  tuner.go             проверка доступности и автоподбор
-  server.go            HTTP-API и выдача страницы
-  tg.go                встроенный прокси Telegram: запуск процесса gust-tg.exe tgproxy, секрет, ссылка tg://proxy, счётчики
-  pages.go             открытые вкладки: повторный запуск обновляет страницу, а не открывает новую
-  discord.go           вкладка Discord: свои проверки, переключение для голоса, перезапуск клиента
-  ui.go                окно интерфейса: открыть/вывести вперёд, запасной путь через браузер
-  ui.html              интерфейс (встраивается в exe)
-internal/tgproxy/      общее для прокси Telegram: порт, секрет, ссылка tg://proxy, формат счётчиков
-internal/platform/     всё, что зависит от Windows (права, процессы, WinDivert, автозапуск)
-  gui_windows.go       окно WebView2 (процесс --window), значок в трее, вывод окна вперёд
-  child.go             дочерний процесс-окно: жив ли, код выхода
+app/             Gust.exe (Rust): вся логика, без async, потоки и свой HTTP/1.1-сервер
+  src/main.rs          запуск: флаги, права, папка данных, веб-сервер, автозапуск, трей
+  src/state.rs         состояние, настройки, журнал; settings.rs — поля настроек
+  src/engine.rs        процесс winws/gust-engine (запуск, watchdog, остановка), распаковка вшитых файлов
+  src/zapret.rs        разбор .bat сборки, скачивание/распаковка, безопасность путей
+  src/strategies.rs    собственные стратегии GU-xx и удалённый strategies.json
+  src/tuner.rs         проверка доступности и автоподбор
+  src/server.rs        HTTP-API и выдача страницы; http.rs — разбор запросов, SSE
+  src/tg.rs            прокси Telegram: процесс gust-tg.exe tgproxy, секрет, ссылка tg://proxy, счётчики
+  src/pages.rs         открытые вкладки: повторный запуск обновляет страницу
+  src/discord.rs       вкладка Discord: свои проверки, переключение для голоса, перезапуск клиента
+  src/update.rs        самообновление с GitHub Releases (проверка SHA256SUMS)
+  src/ui.rs            открыть окно или запасной путь через браузер; ui.html — интерфейс (вшит в exe)
+  src/platform/        всё, что зависит от Windows (win.rs: права, процессы, трей, автозапуск); other.rs — заглушки для тестов
+  src/tests.rs         тесты API и логики (Linux, поддельное дерево zapret)
+window/          gust-window.exe: окно WebView2 (wry + tao), отдельный процесс
+engine/          gust-engine.exe: собственный движок обхода и прокси Telegram
 ```
 
 Не-Windows сборка компилируется (platform-заглушки) — это нужно для тестов; в бою работает только Windows.
 
 ## Окно и трей
 
-Интерфейс открывается во встроенном окне (WebView2, библиотека `go-webview2`), а не во вкладке браузера.
-Окно — отдельный процесс: та же программа с ключом `--window` (служебный, руками не нужен). Если WebView2 упадёт —
-обход не заденет. Закрыли окно — программа остаётся в трее (щелчок или «Открыть Gust» — открыть снова,
-«Выход» — выйти и выключить обход). При автозапуске (`--background`) окна нет, только значок в трее.
-Нет WebView2 на ПК или окно не запустилось — интерфейс открывается в браузере по умолчанию (запись в журнале).
+Интерфейс открывается во встроенном окне WebView2. Окно — отдельный процесс `gust-window.exe`
+(`--window URL --wdata DIR --parent PID`): `wry` на windows-gnu жёстко импортирует `WebView2Loader.dll`,
+а `Gust.exe` обязан запускаться без неё. Поэтому и окно, и загрузчик вшиты в `Gust.exe` и распаковываются
+в `C:\ProgramData\Gust\engine`. Код выхода 3 — нет WebView2, 4 — окно не создалось: тогда интерфейс открывается в браузере.
+Закрыли окно — программа остаётся в трее («Открыть Gust» — открыть снова, «Выход» — выйти и выключить обход).
+При автозапуске (`--background`) окна нет, только значок в трее. Окно закрывается само, если закрылась основная программа.
 
-Зависимости: `go-webview2` и `go-winloader` (MIT). `golang.org/x/sys` подменён зеркалом `github.com/golang/sys` (директива
-`replace` в `go.mod`) — на случай, если `golang.org` недоступен при сборке. Контрольные суммы в `go.sum` сверены с sum.golang.org.
+Иконка и манифест — `gust.ico`, `gust.manifest`, `gust.rc` (встраивает `embed-resource` в `build.rs`).
 
 ## Сборка и тесты
 
 ```sh
-./build.sh            # тесты с -race + exe под Windows в dist/
+./build.sh            # тесты + dist/Gust.exe и dist/gust-engine.exe (нужны cargo и x86_64-w64-mingw32-gcc)
 ```
 
-Вручную:
-
-```sh
-go test -race ./...
-# значок exe: cmd/gust/rsrc_windows_amd64.syso (из cmd/gust/gust.ico, утилита rsrc)
-GOOS=windows GOARCH=amd64 go build -trimpath -ldflags "-H=windowsgui -s -w" -o dist/Gust.exe ./cmd/gust
-```
+Порядок: движок → окно → копия `gust-engine.exe`, `gust-window.exe`, `WebView2Loader.dll` в `app/enginebin/` →
+тесты и сборка `Gust.exe`. Версия берётся из `Cargo.toml`, либо из переменной `GUST_VERSION` (так делает CI по тегу).
+Тесты приложения идут на Linux; для проверки стратегий нужен `GUST_ENGINE_CHECK=<путь к gust-engine>`.
 
 ## Безопасность
 
@@ -71,12 +66,12 @@ GOOS=windows GOARCH=amd64 go build -trimpath -ldflags "-H=windowsgui -s -w" -o d
 
 ## Сторонний код
 
-Прокси Telegram — перенос на Go проекта tg-ws-proxy (Flowseal, MIT). Подробнее — `THIRD_PARTY_NOTICES.md`.
+Прокси Telegram — перенос на Rust проекта tg-ws-proxy (Flowseal, MIT). Подробнее — `THIRD_PARTY_NOTICES.md`.
 
 ## Движок gust-engine (Rust)
 
 `engine/` — собственный движок вместо `winws`, понимает опции `winws` в том объёме, в каком их используют
-`general.bat` сборки и стратегии GU-xx (контрактный тест `TestStrategiesAcceptedByEngine` прогоняет их все через
+`general.bat` сборки и стратегии GU-xx (контрактный тест `strategies_accepted_by_engine` прогоняет их все через
 `gust-engine --check`). Неподдерживаемая опция — ошибка запуска, а не тихий пропуск.
 
 - перехват через WinDivert: `WinDivert.dll` из сборки zapret грузится динамически;
@@ -91,11 +86,11 @@ GOOS=windows GOARCH=amd64 go build -trimpath -ldflags "-H=windowsgui -s -w" -o d
 Тот же бинарник умеет работать прокси Telegram: `gust-engine tgproxy --port 1443 --secret HEX --pool 4`
 (`engine/src/tg`: obfs — рукопожатие и AES-CTR, splitter — нарезка потока на пакеты, ws — WebSocket поверх TLS на rustls,
 pool — пул готовых соединений, mod — приёмник, мост и запасной TCP). Строки вывода: `ready`, `error: …`, `log: …`,
-`stats: {json}`; закрылся stdin — процесс завершается. Совместимость шифрования с прежней Go-версией закреплена
-тестом `matches_go_vector` (`engine/src/tg/vector.json`). Go запускает его из копии `gust-tg.exe`, чтобы остановка
+`stats: {json}`; закрылся stdin — процесс завершается. Совместимость шифрования с эталоном закреплена
+тестом `matches_go_vector` (`engine/src/tg/vector.json`). Gust запускает его из копии `gust-tg.exe`, чтобы остановка
 `gust-engine.exe` не трогала прокси.
 
-Gust вшивает движок в exe (`internal/app/enginebin`, go:embed), распаковывает в `C:\ProgramData\Gust\engine` и строит
+Gust вшивает движок в exe (`app/enginebin`, `include_bytes!`), распаковывает в `C:\ProgramData\Gust\engine` и строит
 для каждой стратегии двойника «Gust · имя». Настройка «Движок обхода»: zapret / Gust / оба.
 
 ```sh

@@ -31,7 +31,7 @@ Settings, the zapret build and the log are kept in `C:\ProgramData\Gust`, access
 
 ## Building from source
 
-Requires Go 1.24+. Run `./build.sh`: tests with the race detector, then `dist/Gust.exe`. The Rust engine lives in `engine/` and is embedded into `Gust.exe` at build time. Releases are built by GitHub Actions on every `v*` tag. Details are in [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
+Requires Rust (stable) with the `x86_64-pc-windows-gnu` target and mingw-w64. Run `./build.sh`: tests, then `dist/Gust.exe`. The bypass engine (`engine/`) and the UI window (`window/`) are built first and embedded into `Gust.exe`. Releases are built by GitHub Actions on every `v*` tag. Details are in [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
 
 ## Disclaimer
 
@@ -72,7 +72,7 @@ Some services are blocked by IP, and DPI bypass can't help those. Use the tool i
 
 ## Сборка из исходников
 
-Нужен Go 1.24+. Команда `./build.sh`: тесты с детектором гонок, затем `dist/Gust.exe`. Движок на Rust — в папке `engine/`, при сборке вшивается в `Gust.exe`. Релизы собирает GitHub Actions на каждый тег `v*`. Подробности — в [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
+Нужен Rust (stable) с целью `x86_64-pc-windows-gnu` и mingw-w64. Команда `./build.sh`: тесты, затем `dist/Gust.exe`. Движок обхода (`engine/`) и окно интерфейса (`window/`) собираются первыми и вшиваются в `Gust.exe`. Релизы собирает GitHub Actions на каждый тег `v*`. Подробности — в [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
 
 ## Отказ от ответственности
 

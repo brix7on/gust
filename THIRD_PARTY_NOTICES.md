@@ -33,3 +33,9 @@ SOFTWARE.
 
 Gust не содержит их кода: сборка [zapret-discord-youtube](https://github.com/Flowseal/zapret-discord-youtube)
 (движок [zapret](https://github.com/bol-van/zapret)) скачивается отдельно, при первом запуске.
+
+## wry, tao, WebView2
+
+Окно интерфейса (`window/`) построено на [wry](https://github.com/tauri-apps/wry) и [tao](https://github.com/tauri-apps/tao)
+(MIT / Apache-2.0). В `Gust.exe` вшит `WebView2Loader.dll` — Microsoft Edge WebView2 Loader (BSD-3-Clause, входит в крейт
+`webview2-com-sys`). Сам WebView2 Runtime устанавливается в Windows отдельно.

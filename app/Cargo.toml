@@ -1,0 +1,40 @@
+[package]
+name = "gust"
+version = "0.9.0"
+edition = "2021"
+license = "MIT"
+description = "DPI bypass for Discord, YouTube and more on Windows"
+build = "build.rs"
+
+[[bin]]
+name = "Gust"
+path = "src/main.rs"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+chrono = { version = "0.4", default-features = false, features = ["clock"] }
+ureq = { version = "3", default-features = false, features = ["rustls", "platform-verifier", "json"] }
+zip = { version = "2", default-features = false, features = ["deflate"] }
+sha2 = "0.10"
+getrandom = "0.3"
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.60", features = [
+  "Win32_Foundation", "Win32_System_Threading", "Win32_System_Diagnostics_ToolHelp",
+  "Win32_UI_WindowsAndMessaging", "Win32_UI_Shell", "Win32_Globalization", "Win32_System_LibraryLoader",
+  "Win32_System_Com", "Win32_Graphics_Gdi"
+] }
+
+[dev-dependencies]
+tempfile = "3"
+
+[build-dependencies]
+embed-resource = "3"
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true

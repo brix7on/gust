@@ -1,0 +1,22 @@
+[package]
+name = "gust-window"
+version = "0.9.0"
+edition = "2021"
+license = "MIT"
+description = "Gust UI window (WebView2 host)"
+build = "build.rs"
+
+[target.'cfg(windows)'.dependencies]
+tao = "0.34"
+wry = "0.52"
+windows-sys = { version = "0.60", features = ["Win32_Foundation", "Win32_System_Threading"] }
+
+[build-dependencies]
+embed-resource = "3"
+
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true

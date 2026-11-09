@@ -3,4 +3,6 @@ dist/
 *.part
 log.txt
 config.json
-internal/app/enginebin/*.exe
+target/
+app/enginebin/*
+!app/enginebin/.gitkeep

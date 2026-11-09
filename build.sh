@@ -1,31 +1,27 @@
 #!/bin/sh
-# Тесты и сборка exe под Windows: сначала движок (Rust), он вшивается в Gust.exe.
+# Тесты и сборка Gust.exe под Windows: движок и окно собираются первыми, их вшивает основной exe.
 set -e
 cd "$(dirname "$0")"
-mkdir -p dist
-rm -f internal/app/enginebin/gust-engine.exe
+T=x86_64-pc-windows-gnu
+mkdir -p dist app/enginebin
+rm -f app/enginebin/*
 
-if command -v cargo >/dev/null 2>&1; then
-	echo ">> движок gust-engine (Rust): тесты и сборка"
-	(cd engine && cargo test -q && cargo build -q && cargo build -q --release --target x86_64-pc-windows-gnu)
-	cp engine/target/x86_64-pc-windows-gnu/release/gust-engine.exe internal/app/enginebin/
-	cp engine/target/x86_64-pc-windows-gnu/release/gust-engine.exe dist/
-	check="$PWD/engine/target/debug/gust-engine"
-else
-	echo ">> cargo не найден: Gust соберётся без собственного движка"
-	check=""
-fi
+echo ">> движок gust-engine: тесты и сборка"
+(cd engine && cargo test -q --locked && cargo build -q --locked && cargo build -q --release --locked --target $T)
 
-echo ">> go vet (linux + windows)"
-go vet ./...
-GOOS=windows GOARCH=amd64 go vet ./...
+echo ">> окно gust-window: сборка"
+(cd window && cargo build -q --release --locked --target $T)
+loader=$(ls "${CARGO_HOME:-$HOME/.cargo}"/registry/src/*/webview2-com-sys-*/x64/WebView2Loader.dll | tail -n1)
 
-echo ">> тесты с детектором гонок"
-GUST_ENGINE_CHECK="$check" go test -race ./...
+cp engine/target/$T/release/gust-engine.exe window/target/$T/release/gust-window.exe app/enginebin/
+cp "$loader" app/enginebin/WebView2Loader.dll
+cp engine/target/$T/release/gust-engine.exe dist/
 
-echo ">> сборка Gust.exe"
-GOOS=windows GOARCH=amd64 go build -trimpath -ldflags "-H=windowsgui -s -w" \
-	-o dist/Gust.exe ./cmd/gust
-rm -f internal/app/enginebin/gust-engine.exe
+echo ">> Gust: тесты"
+(cd app && GUST_ENGINE_CHECK="$PWD/../engine/target/debug/gust-engine" cargo test -q --locked)
+
+echo ">> Gust.exe: сборка"
+(cd app && ${GUST_VERSION:+env GUST_VERSION=$GUST_VERSION} cargo build -q --release --locked --target $T)
+cp app/target/$T/release/Gust.exe dist/
 
 echo ">> готово: dist/"
