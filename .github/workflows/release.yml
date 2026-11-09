@@ -55,7 +55,7 @@ jobs:
           cd dist
           zip -9 "../Gust-$v-windows-x64.zip" Gust.exe
           zip -9 "../gust-engine-$v-windows-x64.zip" gust-engine.exe
-          cd .. && sha256sum *.zip > SHA256SUMS
+          cd .. && cp dist/Gust.exe Gust.exe && sha256sum *.zip Gust.exe > SHA256SUMS
 
       - uses: actions/upload-artifact@v4
         with:
@@ -67,8 +67,8 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "$GITHUB_REF_NAME" ./*.zip SHA256SUMS \
+          gh release create "$GITHUB_REF_NAME" ./*.zip Gust.exe SHA256SUMS \
             --title "Gust ${GITHUB_REF_NAME#v}" \
-            --notes "Распакуйте \`Gust-…-windows-x64.zip\` и запустите \`Gust.exe\`. Собственный движок уже встроен в Gust.exe (Настройки → Движок обхода); отдельный \`gust-engine\` — для запуска вручную.
-          Unpack \`Gust-…-windows-x64.zip\` and run \`Gust.exe\`. The own engine is built into Gust.exe (Settings → Bypass engine); the separate \`gust-engine\` is for manual use." \
+            --notes "Скачайте \`Gust.exe\` и запустите (или \`Gust-…-windows-x64.zip\`, если exe блокирует браузер). Собственный движок уже встроен в Gust.exe (Настройки → Движок обхода); отдельный \`gust-engine\` — для запуска вручную.
+          Download and run \`Gust.exe\` (or \`Gust-…-windows-x64.zip\` if the browser blocks the exe). The own engine is built into Gust.exe (Settings → Bypass engine); the separate \`gust-engine\` is for manual use." \
             --generate-notes
