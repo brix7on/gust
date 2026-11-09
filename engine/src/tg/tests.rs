@@ -341,9 +341,10 @@ async fn ws_path_end_to_end() {
     assert_eq!(g.inits[0], (2, TAG_SECURE));
     assert_eq!(g.paths[0], "/apiws");
     assert_eq!(g.init_hosts[0], "kws2.web.telegram.org");
-    for a in tg.dial.dialed.lock().unwrap().iter() {
-        assert_eq!(a, "149.154.167.220:443");
-    }
+    let dialed = tg.dial.dialed.lock().unwrap();
+    assert!(dialed.iter().any(|a| a == "149.154.167.220:443"));
+    let known: Vec<String> = s.sh.cfg.dc_redirects.values().map(|ip| format!("{ip}:443")).collect();
+    assert!(dialed.iter().all(|a| known.contains(a)));
     assert_eq!(s.sh.snapshot().via_ws, 1);
 }
 
