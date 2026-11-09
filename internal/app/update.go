@@ -113,7 +113,7 @@ func (a *App) updateLoop() {
 		select {
 		case <-a.quit:
 			return
-		case <-time.After(6 * time.Hour):
+		case <-time.After(time.Hour):
 		}
 	}
 }

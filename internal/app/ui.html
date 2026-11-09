@@ -456,7 +456,7 @@ if (LANG === "en") (() => {
   };
   const P = [
     [/^Обновить до (.*)$/, "Update to $1"], [/^Загрузка… (.*)$/, "Downloading… $1"],
-    [/^Недоступно: (.*)$/, "Unavailable: $1"], [/^Соединений: (.*)$/, "Connections: $1"],
+    [/^Недоступно: (.*)$/, "Unavailable: $1"], [/^(.*) — недоступно: (.*)$/, "$1 — unavailable: $2"], [/^Соединений: (.*)$/, "Connections: $1"],
     [/^Проверено в (.*?)\. Нет интернета\.$/, "Checked at $1. No internet."], [/^Проверено в (.*)$/, "Checked at $1"],
     [/^Текущая: «(.*)»$/, "Current: “$1”"], [/^Проверка «(.*)» \((\d+) из (\d+)\)$/, "Testing “$1” ($2 of $3)"],
     [/^Проверяю «(.*)» \((\d+) из (\d+)\)…$/, "Testing “$1” ($2 of $3)…"], [/^(\d+) из (\d+)$/, "$1 of $2"],
@@ -580,7 +580,7 @@ function render() {
   } else if (run) {
     if (!checked.length) setHero("ok", "Обход включён", "Проверка…");
     else if (!failing.length) setHero("ok", "Обход активен", e.strategy);
-    else setHero("warn", "Частичный доступ", "Недоступно: " + failing.join(", "));
+    else setHero("warn", "Частичный доступ", e.strategy + " — недоступно: " + failing.join(", "));
   } else {
     setHero("idle", "Обход отключён", "");
   }

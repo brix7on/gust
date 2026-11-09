@@ -58,7 +58,7 @@ func (a *App) routes() http.Handler {
 	post("/api/update", func(*http.Request) error { return a.startUpdate() })
 	post("/api/tune", func(*http.Request) error { return a.startTune() })
 	post("/api/tune/cancel", func(*http.Request) error { a.cancelTune(); return nil })
-	post("/api/check", func(*http.Request) error { go a.CheckNow(); return nil })
+	post("/api/check", func(*http.Request) error { go a.CheckNow(); go a.checkUpdate(); return nil })
 	post("/api/setup/install", func(*http.Request) error {
 		a.mu.Lock()
 		busy := a.setup.Busy
