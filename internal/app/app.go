@@ -23,8 +23,8 @@ type Settings struct {
 	DiscordDirect   bool            `json:"discord_direct"` // запускать Discord мимо системного прокси (VPN)
 	TGEnabled       bool            `json:"tg_enabled"`     // прокси Telegram включён — поднимаем при запуске
 	LastTune        int64           `json:"last_tune"`
-	Lang            string          `json:"lang"`        // auto, ru, en
-	Engine          string          `json:"engine"`      // zapret, gust, both
+	Lang            string          `json:"lang"`   // auto, ru, en
+	Engine          string          `json:"engine"` // zapret, gust, both
 	EnginePicked    bool            `json:"engine_picked"`
 	AddedHosts      []string        `json:"added_hosts"` // домены, которые программа сама дописала в list-general-user.txt
 }
@@ -238,6 +238,8 @@ func (a *App) updateSettings(f func(s *Settings)) {
 func (a *App) boot() {
 	platform.KillWinws() // остатки прошлого запуска, если приложение падало
 	go a.healthLoop()
+	go a.updateLoop()
+	go func() { time.Sleep(15 * time.Second); cleanupOldExe() }()
 	s := a.settings()
 	if platform.AutostartEnabled(Name) {
 		// обновляем задачу: после переезда exe или со старыми настройками она иначе не сработает

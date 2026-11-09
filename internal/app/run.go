@@ -16,10 +16,11 @@ import (
 
 // Options — параметры запуска из командной строки.
 type Options struct {
-	DataDir    string
-	Port       int
-	Background bool
-	NoAdmin    bool
+	DataDir     string
+	Port        int
+	Background  bool
+	NoAdmin     bool
+	AfterUpdate bool
 }
 
 // DefaultDataDir — папка данных по умолчанию. На Windows это ASCII-путь без пробелов и
@@ -42,6 +43,9 @@ func DefaultDataDir() string {
 // Run поднимает приложение: права, папка данных, локальный веб-интерфейс, автозапуск обхода.
 func Run(opt Options) {
 	addr := fmt.Sprintf("127.0.0.1:%d", opt.Port)
+	if opt.AfterUpdate {
+		waitPortFree(addr, 20*time.Second)
+	}
 	// Уже запущена другая копия — не просим права и не плодим окна: работающая копия сама выводит
 	// окно вперёд (или открывает его). Проверка до UAC, чтобы Windows не спрашивал зря.
 	if !opt.Background {

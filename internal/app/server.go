@@ -55,6 +55,7 @@ func (a *App) routes() http.Handler {
 		a.eng.Stop()
 		return nil
 	})
+	post("/api/update", func(*http.Request) error { return a.startUpdate() })
 	post("/api/tune", func(*http.Request) error { return a.startTune() })
 	post("/api/tune/cancel", func(*http.Request) error { a.cancelTune(); return nil })
 	post("/api/check", func(*http.Request) error { go a.CheckNow(); return nil })
@@ -240,6 +241,7 @@ type stateOut struct {
 	Log        []string    `json:"log"`
 	Services   []Service   `json:"services"`
 	EngineOK   bool        `json:"engine_available"`
+	Update     UpdateState `json:"update"`
 }
 
 func (a *App) handleState(w http.ResponseWriter, r *http.Request) {
@@ -251,6 +253,7 @@ func (a *App) handleState(w http.ResponseWriter, r *http.Request) {
 	a.mu.Lock()
 	out := stateOut{
 		Version:    Version,
+		Update:     updateState(),
 		OS:         runtime.GOOS,
 		Admin:      platform.IsAdmin(),
 		SetupReady: len(names) > 0,

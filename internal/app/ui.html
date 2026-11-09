@@ -33,6 +33,7 @@
   .brand{display:flex;align-items:baseline;gap:12px}
   .brand h1{margin:0;font:400 22px/1 var(--font-d);letter-spacing:.5em}
   .brand span{font:12px var(--font-d);opacity:1}
+  .brand .upd{font:12px var(--font-d);padding:2px 8px}
   nav{display:flex;gap:0;background:var(--ink);border:1px solid var(--paper)}
   nav button{border:0;background:none;color:var(--paper);padding:7px 13px;font:13px var(--font-d);letter-spacing:.08em}
   nav button:hover{text-decoration:underline}
@@ -137,7 +138,7 @@
 <div id="bg" data-v="eye"></div>
 <div class="wrap">
   <div class="top">
-    <div class="brand"><h1>Gust</h1><span id="ver"></span></div>
+    <div class="brand"><h1>Gust</h1><span id="ver"></span><button id="btnUpd" class="upd" hidden></button></div>
     <nav role="tablist" aria-label="Разделы">
       <button role="tab" data-tab="home" aria-selected="true">Главная</button>
       <button role="tab" data-tab="discord" aria-selected="false">Discord</button>
@@ -385,7 +386,7 @@ const LANG = "{{LANG}}";
 if (LANG === "en") (() => {
   document.documentElement.lang = "en";
   const D = {
-    "Главная": "Home", "Настройки": "Settings", "Прочее": "More", "Разделы": "Sections",
+    "Главная": "Home", "Ошибка обновления": "Update failed", "Загрузка…": "Downloading…", "Перезапуск…": "Restarting…", "Настройки": "Settings", "Прочее": "More", "Разделы": "Sections",
     "Загрузить компоненты": "Download components", "Подобрать заново": "Re-tune", "Подобрать": "Auto-tune", "Остановить": "Stop",
     "Подбор стратегии": "Strategy tuning", "Результаты": "Results", "Доступность": "Availability", "Проверить": "Check",
     "Требуется сборка zapret (": "Requires the zapret build (", "), загружается один раз.": "), downloaded once.",
@@ -454,6 +455,7 @@ if (LANG === "en") (() => {
     "не нашёл последний релиз (GitHub недоступен?)": "latest release not found (GitHub unreachable?)", "в архиве нет файлов сборки zapret": "no zapret build files in the archive",
   };
   const P = [
+    [/^Обновить до (.*)$/, "Update to $1"], [/^Загрузка… (.*)$/, "Downloading… $1"],
     [/^Недоступно: (.*)$/, "Unavailable: $1"], [/^Соединений: (.*)$/, "Connections: $1"],
     [/^Проверено в (.*?)\. Нет интернета\.$/, "Checked at $1. No internet."], [/^Проверено в (.*)$/, "Checked at $1"],
     [/^Текущая: «(.*)»$/, "Current: “$1”"], [/^Проверка «(.*)» \((\d+) из (\d+)\)$/, "Testing “$1” ($2 of $3)"],
@@ -550,6 +552,11 @@ function setHero(state, title, sub) {
 function render() {
   const s = S, e = s.engine, t = s.tune;
   $("ver").textContent = "v" + s.version;
+  const u = s.update || {}, bu = $("btnUpd");
+  bu.hidden = !u.latest && !u.err;
+  bu.disabled = !!u.busy;
+  bu.textContent = u.busy ? u.msg : u.err ? "Ошибка обновления" : "Обновить до v" + u.latest;
+  bu.title = u.err || "";
 
   let ban = "";
   if (!s.admin) ban += '<div class="banner bad"><b>Нет прав администратора.</b> Драйвер WinDivert не загрузится. Закройте программу и запустите снова, согласившись на запрос Windows.</div>';
@@ -731,6 +738,7 @@ $("btnToggle").onclick = () => api(S.engine.running ? "/api/stop" : "/api/start"
 $("btnTune").onclick = () => api("/api/tune");
 $("btnTuneCancel").onclick = () => api("/api/tune/cancel");
 $("btnInstall").onclick = () => api("/api/setup/install");
+$("btnUpd").onclick = () => api("/api/update");
 $("btnCheck").onclick = () => api("/api/check");
 $("btnApply").onclick = () => api("/api/select", {name: $("strat").value});
 $("oAuto").onchange = e => api("/api/autostart", {enabled: e.target.checked});
