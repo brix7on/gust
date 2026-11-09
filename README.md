@@ -29,7 +29,7 @@ Settings, the zapret build and the log are kept in `C:\ProgramData\Gust`, access
 
 ## Building from source
 
-Requires Go 1.24+. Run `./build.sh`: tests with the race detector, then `dist/Gust.exe`. Details are in [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
+Requires Go 1.24+. Run `./build.sh`: tests with the race detector, then `dist/Gust.exe`. The experimental Rust engine lives in `engine/`. Releases are built by GitHub Actions on every `v*` tag. Details are in [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
 
 ## Disclaimer
 
@@ -68,7 +68,7 @@ Some services are blocked by IP, and DPI bypass can't help those. Use the tool i
 
 ## Сборка из исходников
 
-Нужен Go 1.24+. Команда `./build.sh`: тесты с детектором гонок, затем `dist/Gust.exe`. Подробности — в [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
+Нужен Go 1.24+. Команда `./build.sh`: тесты с детектором гонок, затем `dist/Gust.exe`. Экспериментальный движок на Rust — в папке `engine/`. Релизы собирает GitHub Actions на каждый тег `v*`. Подробности — в [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
 
 ## Отказ от ответственности
 

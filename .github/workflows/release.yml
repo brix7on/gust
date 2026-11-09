@@ -1,0 +1,71 @@
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Toolchain for Windows
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q gcc-mingw-w64-x86-64
+          rustup target add x86_64-pc-windows-gnu
+
+      - name: Test Gust
+        run: |
+          go vet ./...
+          GOOS=windows GOARCH=amd64 go vet ./...
+          go test -race ./...
+
+      - name: Test engine
+        working-directory: engine
+        run: |
+          cargo test --locked
+
+      - name: Build
+        run: |
+          mkdir -p dist
+          ver=""
+          case "$GITHUB_REF" in refs/tags/v*) ver="-X gust/internal/app.Version=${GITHUB_REF_NAME#v}" ;; esac
+          GOOS=windows GOARCH=amd64 go build -trimpath -ldflags "-H=windowsgui -s -w $ver" -o dist/Gust.exe ./cmd/gust
+          (cd engine && cargo build --release --locked --target x86_64-pc-windows-gnu)
+          cp engine/target/x86_64-pc-windows-gnu/release/gust-engine.exe dist/
+
+      - name: Package
+        run: |
+          v="${GITHUB_REF_NAME#v}"
+          case "$GITHUB_REF" in refs/tags/*) ;; *) v="dev-${GITHUB_SHA::7}" ;; esac
+          cd dist
+          zip -9 "../Gust-$v-windows-x64.zip" Gust.exe
+          zip -9 "../gust-engine-$v-windows-x64.zip" gust-engine.exe
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-x64
+          path: "*.zip"
+
+      - name: Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" ./*.zip \
+            --title "Gust ${GITHUB_REF_NAME#v}" \
+            --notes "Распакуйте \`Gust-…-windows-x64.zip\` и запустите \`Gust.exe\`. \`gust-engine\` — экспериментальный движок, отдельно пока не нужен.
+          Unpack \`Gust-…-windows-x64.zip\` and run \`Gust.exe\`. \`gust-engine\` is an experimental engine, not needed yet." \
+            --generate-notes

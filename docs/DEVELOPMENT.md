@@ -38,8 +38,7 @@ internal/platform/     всё, что зависит от Windows (права, �
 Нет WebView2 на ПК или окно не запустилось — интерфейс открывается в браузере по умолчанию (запись в журнале).
 
 Зависимости: `go-webview2` и `go-winloader` (MIT). `golang.org/x/sys` подменён зеркалом `github.com/golang/sys` (директива
-`replace` в `go.mod`) — на случай, если `golang.org` недоступен при сборке. Контрольные суммы в `go.sum` записаны без
-проверки через sum.golang.org — при первой сборке на обычной машине стоит выполнить `go mod verify` и сверить `go.sum`.
+`replace` в `go.mod`) — на случай, если `golang.org` недоступен при сборке. Контрольные суммы в `go.sum` сверены с sum.golang.org.
 
 ## Сборка и тесты
 
@@ -77,3 +76,26 @@ GOOS=windows GOARCH=amd64 go build -trimpath -ldflags "-H=windowsgui -s -w" -o d
 ## Сторонний код
 
 Прокси Telegram — перенос на Go проекта tg-ws-proxy (Flowseal, MIT). Подробнее — `THIRD_PARTY_NOTICES.md`.
+
+## Движок gust-engine (Rust, экспериментальный)
+
+`engine/` — собственный движок вместо `winws`: перехват через WinDivert (`WinDivert.dll` из сборки zapret грузится
+динамически), склейка ClientHello из двух пакетов, `multisplit` / `multidisorder` с позициями
+`N, host, endhost, sld, midsld, endsld, sniext[+-N]`, `seqovl` с шаблоном, хостлисты и профили через `--new`.
+Аргументы совпадают с `winws` по смыслу; неподдерживаемые опции — ошибка, а не тихий пропуск.
+
+```sh
+cd engine
+cargo test
+cargo build --release --target x86_64-pc-windows-gnu   # нужен x86_64-w64-mingw32-gcc
+gust-engine --check <аргументы>                        # проверить аргументы без запуска
+```
+
+## Релизы
+
+`.github/workflows/release.yml`: на каждый push в `main` и pull request — тесты и сборка (архивы во вкладке Actions),
+на тег `v*` — то же плюс релиз с `Gust-<версия>-windows-x64.zip` и `gust-engine-<версия>-windows-x64.zip`.
+
+```sh
+git tag v0.6.5 && git push origin v0.6.5
+```
