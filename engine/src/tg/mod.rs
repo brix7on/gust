@@ -27,6 +27,7 @@ use ws::WsConn;
 
 pub const DEFAULT_PORT: u16 = 1443;
 const STALL_LIMIT: Duration = Duration::from_secs(20);
+const DEAD_LIMIT: Duration = Duration::from_secs(8);
 
 // Where to connect in tests: every address leads to one local server.
 pub struct Dial {
@@ -462,7 +463,8 @@ async fn bridge_ws(
                     continue;
                 }
                 let waited = Duration::from_millis(ms().saturating_sub(since));
-                if waited > STALL_LIMIT {
+                let limit = if route == "по WebSocket" && !got_down.load(Relaxed) { DEAD_LIMIT } else { STALL_LIMIT };
+                if waited > limit {
                     sh.st.stalled.fetch_add(1, Relaxed);
                     sh.log_throttled("stall", || {
                         format!(

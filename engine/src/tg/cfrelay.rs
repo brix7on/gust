@@ -4,15 +4,22 @@
 use super::pool::PoolKey;
 use super::ws::{dial_ws, DialOpts, WsConn};
 use super::Shared;
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
-use std::time::Duration;
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::sync::{Arc, Mutex};
+use std::time::{Duration, Instant};
+
+const TRIES: usize = 3;
+const STAGGER: Duration = Duration::from_millis(1200);
+const ATTEMPT: Duration = Duration::from_secs(6);
+const DNS_TTL: Duration = Duration::from_secs(300);
 
 static SEEN_OK: AtomicBool = AtomicBool::new(false);
+static NEXT: AtomicUsize = AtomicUsize::new(0);
 
 pub struct Relay {
     host: String,
     key: String,
+    addrs: Mutex<Option<(Instant, Vec<String>)>>,
 }
 
 impl Relay {
@@ -29,37 +36,75 @@ impl Relay {
         if host.is_empty() || !key.chars().all(|c| c.is_ascii_alphanumeric()) {
             return None;
         }
-        Some(Relay { host: host.to_string(), key: key.to_string() })
+        Some(Relay { host: host.to_string(), key: key.to_string(), addrs: Mutex::new(None) })
+    }
+
+    // Edge addresses of the host (IPv4 first), refreshed every few minutes.
+    async fn resolve(&self) -> Vec<String> {
+        if let Some((t, a)) = self.addrs.lock().unwrap().as_ref() {
+            if t.elapsed() < DNS_TTL {
+                return a.clone();
+            }
+        }
+        let all: Vec<std::net::SocketAddr> = match tokio::net::lookup_host((self.host.as_str(), 443)).await {
+            Ok(it) => it.collect(),
+            Err(_) => Vec::new(),
+        };
+        let v4: Vec<String> = all.iter().filter(|a| a.is_ipv4()).map(|a| a.to_string()).collect();
+        let mut list = if v4.is_empty() { all.iter().map(|a| a.to_string()).collect() } else { v4 };
+        if list.is_empty() {
+            list.push(format!("{}:443", self.host));
+        }
+        *self.addrs.lock().unwrap() = Some((Instant::now(), list.clone()));
+        list
     }
 }
 
+// Up to TRIES handshakes, each through the next edge address; a new one starts when the previous
+// failed or did not answer within STAGGER, the first success wins.
 pub async fn connect(sh: &Arc<Shared>, r: &Relay, k: PoolKey) -> Option<Arc<WsConn>> {
-    for _ in 0..2 {
-        let o = DialOpts {
-            addr: format!("{}:443", r.host),
-            host: r.host.clone(),
-            path: format!("/tg?dc={}&key={}", k.dc, r.key),
-            sni: None,
-            no_check: false,
-            timeout: Duration::from_secs(6),
-            roots: sh.cfg.roots.clone(),
-            dial: sh.cfg.dial.clone(),
-        };
-        match dial_ws(o).await {
-            Ok(w) => {
+    let addrs = r.resolve().await;
+    let base = NEXT.fetch_add(1, Ordering::Relaxed);
+    let mut set = tokio::task::JoinSet::new();
+    let mut started = 0;
+    loop {
+        if started < TRIES {
+            let o = DialOpts {
+                addr: addrs[(base + started) % addrs.len()].clone(),
+                host: r.host.clone(),
+                path: format!("/tg?dc={}&key={}", k.dc, r.key),
+                sni: None,
+                no_check: false,
+                timeout: ATTEMPT,
+                roots: sh.cfg.roots.clone(),
+                dial: sh.cfg.dial.clone(),
+            };
+            started += 1;
+            set.spawn(dial_ws(o));
+        }
+        let wait = if started < TRIES { STAGGER } else { ATTEMPT };
+        match tokio::time::timeout(wait, set.join_next()).await {
+            Ok(Some(Ok(Ok(w)))) => {
+                set.abort_all();
                 if !SEEN_OK.swap(true, Ordering::Relaxed) {
                     sh.log("Telegram: запасной WebSocket-путь работает".into());
                 }
                 return Some(Arc::new(w));
             }
-            Err(e) => {
+            Ok(Some(Ok(Err(e)))) => {
                 sh.st.ws_errors.fetch_add(1, Ordering::Relaxed);
                 let why = e.short();
                 sh.log_throttled(&format!("alt {why}"), || format!("Telegram: запасной WebSocket-путь недоступен ({why})"));
             }
+            Ok(Some(Err(_))) => {}
+            Ok(None) => return None,
+            Err(_) if started >= TRIES => {
+                set.abort_all();
+                return None;
+            }
+            Err(_) => {}
         }
     }
-    None
 }
 
 #[cfg(test)]
@@ -72,5 +117,11 @@ mod tests {
         assert_eq!((r.host.as_str(), r.key.as_str()), ("gust.example.net", "abc123"));
         assert!(Relay::parse("only-host").is_none());
         assert!(Relay::parse("host bad!").is_none());
+    }
+
+    #[tokio::test]
+    async fn resolves_literal_ip() {
+        let r = Relay::parse("127.0.0.1 k").unwrap();
+        assert_eq!(r.resolve().await, vec!["127.0.0.1:443".to_string()]);
     }
 }
