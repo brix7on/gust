@@ -34,29 +34,32 @@ impl Relay {
 }
 
 pub async fn connect(sh: &Arc<Shared>, r: &Relay, k: PoolKey) -> Option<Arc<WsConn>> {
-    let o = DialOpts {
-        addr: format!("{}:443", r.host),
-        host: r.host.clone(),
-        path: format!("/tg?dc={}&key={}", k.dc, r.key),
-        sni: None,
-        no_check: false,
-        timeout: Duration::from_secs(8),
-        roots: sh.cfg.roots.clone(),
-        dial: sh.cfg.dial.clone(),
-    };
-    match dial_ws(o).await {
-        Ok(w) => {
-            if !SEEN_OK.swap(true, Ordering::Relaxed) {
-                sh.log("Telegram: запасной WebSocket-путь работает".into());
+    for _ in 0..2 {
+        let o = DialOpts {
+            addr: format!("{}:443", r.host),
+            host: r.host.clone(),
+            path: format!("/tg?dc={}&key={}", k.dc, r.key),
+            sni: None,
+            no_check: false,
+            timeout: Duration::from_secs(6),
+            roots: sh.cfg.roots.clone(),
+            dial: sh.cfg.dial.clone(),
+        };
+        match dial_ws(o).await {
+            Ok(w) => {
+                if !SEEN_OK.swap(true, Ordering::Relaxed) {
+                    sh.log("Telegram: запасной WebSocket-путь работает".into());
+                }
+                return Some(Arc::new(w));
             }
-            Some(Arc::new(w))
-        }
-        Err(e) => {
-            sh.st.ws_errors.fetch_add(1, Ordering::Relaxed);
-            sh.log_throttled("alt", || format!("Telegram: запасной WebSocket-путь недоступен ({})", e.short()));
-            None
+            Err(e) => {
+                sh.st.ws_errors.fetch_add(1, Ordering::Relaxed);
+                let why = e.short();
+                sh.log_throttled(&format!("alt {why}"), || format!("Telegram: запасной WebSocket-путь недоступен ({why})"));
+            }
         }
     }
+    None
 }
 
 #[cfg(test)]
