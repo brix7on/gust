@@ -28,6 +28,7 @@ use ws::WsConn;
 pub const DEFAULT_PORT: u16 = 1443;
 const STALL_LIMIT: Duration = Duration::from_secs(20);
 const DEAD_LIMIT: Duration = Duration::from_secs(8);
+const RELAY_STALL_LIMIT: Duration = Duration::from_secs(10);
 
 // Where to connect in tests: every address leads to one local server.
 pub struct Dial {
@@ -317,10 +318,10 @@ async fn handle(sh: Arc<Shared>, mut c: TcpStream) {
 
     // 0) hosted relay (when configured)
     if let Some(r) = sh.cfg.relay.as_ref().filter(|_| !h.test) {
-        if let Some(ws) = cfrelay::connect(&sh, r, k).await {
+        if let Some((ws, edge)) = cfrelay::connect(&sh, r, k).await {
             if ws.send(&[relay.to_vec()]).await.is_ok() {
                 sh.st.via_ws.fetch_add(1, Relaxed);
-                bridge_ws(&sh, c, ws, up, down, Splitter::new(&h.proto_tag), "по WebSocket", h.media).await;
+                bridge_ws(&sh, c, ws, up, down, Splitter::new(&h.proto_tag), "по WebSocket", h.media, Some(edge)).await;
                 return;
             }
             ws.close().await;
@@ -336,7 +337,7 @@ async fn handle(sh: Arc<Shared>, mut c: TcpStream) {
         if let Some(ws) = ws {
             if ws.send(&[relay.to_vec()]).await.is_ok() {
                 sh.st.via_ws.fetch_add(1, Relaxed);
-                bridge_ws(&sh, c, ws, up, down, Splitter::new(&h.proto_tag), "напрямую", h.media).await;
+                bridge_ws(&sh, c, ws, up, down, Splitter::new(&h.proto_tag), "напрямую", h.media, None).await;
                 return;
             }
             ws.close().await;
@@ -397,10 +398,12 @@ async fn bridge_ws(
     mut sp: Splitter,
     route: &'static str,
     watch: bool,
+    edge: Option<String>,
 ) {
     use obfs::StreamCipher as _;
     let (mut cr, mut cw) = c.into_split();
     let got_down = Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let down_bytes = Arc::new(AtomicU64::new(0));
     // when Telegram stopped answering what was sent (ms since start + 1), 0 — all is fine
     let pending = Arc::new(AtomicU64::new(0));
     let started = Instant::now();
@@ -432,13 +435,14 @@ async fn bridge_ws(
         })
     };
     let t_down = {
-        let (sh, ws, pending, got_down) = (sh.clone(), ws.clone(), pending.clone(), got_down.clone());
+        let (sh, ws, pending, got_down, down_bytes) = (sh.clone(), ws.clone(), pending.clone(), got_down.clone(), down_bytes.clone());
         tokio::spawn(async move {
             loop {
                 let Ok(mut data) = ws.recv().await else { return };
                 got_down.store(true, Relaxed);
                 pending.store(0, Relaxed);
                 sh.st.bytes_down.fetch_add(data.len() as i64, Relaxed);
+                down_bytes.fetch_add(data.len() as u64, Relaxed);
                 down.tg_dec.apply_keystream(&mut data);
                 down.clt_enc.apply_keystream(&mut data);
                 if cw.write_all(&data).await.is_err() {
@@ -450,7 +454,7 @@ async fn bridge_ws(
     // Watchdog: the path "hung" (connection open, no reply — the network silently cut the session).
     // Closing makes Telegram reconnect over a fresh path instead of waiting for its long timeouts.
     let t_watch = tokio::spawn({
-        let (sh, got_down, pending) = (sh.clone(), got_down.clone(), pending.clone());
+        let (sh, got_down, pending, edge, down_bytes) = (sh.clone(), got_down.clone(), pending.clone(), edge.clone(), down_bytes.clone());
         async move {
             if !watch {
                 return std::future::pending::<()>().await;
@@ -463,9 +467,13 @@ async fn bridge_ws(
                     continue;
                 }
                 let waited = Duration::from_millis(ms().saturating_sub(since));
-                let limit = if route == "по WebSocket" && !got_down.load(Relaxed) { DEAD_LIMIT } else { STALL_LIMIT };
+                let limit = if route == "по WebSocket" && !got_down.load(Relaxed) { DEAD_LIMIT } else if edge.is_some() { RELAY_STALL_LIMIT } else { STALL_LIMIT };
                 if waited > limit {
                     sh.st.stalled.fetch_add(1, Relaxed);
+                    if let Some(a) = &edge {
+                        cfrelay::mark_bad(a);
+                        sh.log_throttled("stalledge", || format!("Telegram: relay edge {a} silent after {} KB", down_bytes.load(Relaxed) / 1024));
+                    }
                     sh.log_throttled("stall", || {
                         format!(
                             "Telegram: медиа-соединение {route} молчит {} с (живо {} с, ответы были: {}) — закрываю, Telegram откроет новое",

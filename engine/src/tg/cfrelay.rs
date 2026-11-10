@@ -15,6 +15,19 @@ const DNS_TTL: Duration = Duration::from_secs(300);
 
 static SEEN_OK: AtomicBool = AtomicBool::new(false);
 static NEXT: AtomicUsize = AtomicUsize::new(0);
+static BAD: Mutex<Vec<(String, Instant)>> = Mutex::new(Vec::new());
+const BAD_TTL: Duration = Duration::from_secs(120);
+
+// Edge address whose connection went silent: avoided for a while
+pub fn mark_bad(addr: &str) {
+    let mut b = BAD.lock().unwrap();
+    b.retain(|(a, t)| a != addr && t.elapsed() < BAD_TTL);
+    b.push((addr.to_string(), Instant::now()));
+}
+
+fn is_bad(addr: &str) -> bool {
+    BAD.lock().unwrap().iter().any(|(a, t)| a == addr && t.elapsed() < BAD_TTL)
+}
 
 pub struct Relay {
     host: String,
@@ -66,8 +79,10 @@ impl Relay {
 
 // Up to TRIES handshakes, each through the next edge address; a new one starts when the previous
 // failed or did not answer within STAGGER, the first success wins.
-pub async fn connect(sh: &Arc<Shared>, r: &Relay, k: PoolKey) -> Option<Arc<WsConn>> {
-    let addrs = r.resolve().await;
+pub async fn connect(sh: &Arc<Shared>, r: &Relay, k: PoolKey) -> Option<(Arc<WsConn>, String)> {
+    let all = r.resolve().await;
+    let good: Vec<String> = all.iter().filter(|a| !is_bad(a)).cloned().collect();
+    let addrs = if good.is_empty() { all } else { good };
     let base = NEXT.fetch_add(1, Ordering::Relaxed);
     let mut set = tokio::task::JoinSet::new();
     let mut started = 0;
@@ -84,16 +99,17 @@ pub async fn connect(sh: &Arc<Shared>, r: &Relay, k: PoolKey) -> Option<Arc<WsCo
                 dial: sh.cfg.dial.clone(),
             };
             started += 1;
-            set.spawn(dial_ws(o));
+            let addr = o.addr.clone();
+            set.spawn(async move { dial_ws(o).await.map(|w| (w, addr)) });
         }
         let wait = if started < TRIES { STAGGER } else { ATTEMPT };
         match tokio::time::timeout(wait, set.join_next()).await {
-            Ok(Some(Ok(Ok(w)))) => {
+            Ok(Some(Ok(Ok((w, addr))))) => {
                 set.abort_all();
                 if !SEEN_OK.swap(true, Ordering::Relaxed) {
                     sh.log("Telegram: запасной WebSocket-путь работает".into());
                 }
-                return Some(Arc::new(w));
+                return Some((Arc::new(w), addr));
             }
             Ok(Some(Ok(Err(e)))) => {
                 sh.st.ws_errors.fetch_add(1, Ordering::Relaxed);
