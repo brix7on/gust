@@ -140,7 +140,7 @@ impl App {
                 }
                 Ok(())
             }
-            "/api/update" => self.start_update(),
+            "/api/update" => self.start_update(false),
             "/api/tune" => self.start_tune(),
             "/api/tune/cancel" => {
                 self.cancel_tune();

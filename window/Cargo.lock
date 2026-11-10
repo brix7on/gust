@@ -793,7 +793,7 @@ dependencies = [
 
 [[package]]
 name = "gust-window"
-version = "0.9.8"
+version = "0.9.9"
 dependencies = [
  "embed-resource",
  "tao",

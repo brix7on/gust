@@ -106,6 +106,7 @@ impl App {
         }
         loop {
             self.check_update();
+            let _ = self.start_update(true);
             self.fetch_strategies();
             if self.wait_quit(Duration::from_secs(3600)) {
                 return;
@@ -113,7 +114,7 @@ impl App {
         }
     }
 
-    pub fn start_update(self: &Arc<Self>) -> Result<(), String> {
+    pub fn start_update(self: &Arc<Self>, silent: bool) -> Result<(), String> {
         if self.tuning() {
             return Err("идёт подбор — дождитесь конца".into());
         }
@@ -132,7 +133,7 @@ impl App {
         };
         let app = self.clone();
         std::thread::spawn(move || {
-            if let Err(e) = app.do_update(&zip_url, &sums_url, &zip_name, &ver) {
+            if let Err(e) = app.do_update(&zip_url, &sums_url, &zip_name, &ver, silent) {
                 app.logf(format!("обновление: {e}"));
                 set_upd(|s| {
                     s.busy = false;
@@ -144,7 +145,7 @@ impl App {
         Ok(())
     }
 
-    fn do_update(&self, zip_url: &str, sums_url: &str, zip_name: &str, ver: &str) -> Result<(), String> {
+    fn do_update(&self, zip_url: &str, sums_url: &str, zip_name: &str, ver: &str, silent: bool) -> Result<(), String> {
         let exe = std::env::current_exe().and_then(fs::canonicalize).map_err(|e| e.to_string())?;
         let dir = self.data_dir.join("update");
         let _ = fs::remove_dir_all(&dir);
@@ -179,6 +180,9 @@ impl App {
         self.logf(format!("обновлено до {ver}, перезапуск"));
         set_upd(|s| s.msg = "Перезапуск…".into());
         let mut args = vec!["--after-update".to_string()];
+        if silent {
+            args.push("--background".to_string());
+        }
         for x in std::env::args().skip(1) {
             if x != "--background" && x != "-background" && x != "--after-update" {
                 args.push(x);
