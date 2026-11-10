@@ -50,10 +50,13 @@ fn main() {
     }
     let check = args.iter().any(|a| a == "--check");
     args.retain(|a| a != "--check");
-    let cfg = config::parse(&args).unwrap_or_else(|e| {
+    let mut cfg = config::parse(&args).unwrap_or_else(|e| {
         eprintln!("gust-engine: {e}");
         exit(2)
     });
+    if let Some(r) = tg::cfrelay::Relay::load() {
+        cfg.desync_host(r.host());
+    }
     if check {
         println!("ok: {} profile(s)", cfg.profiles.len());
         println!("filter: {}", cfg.filter());

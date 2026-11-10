@@ -465,6 +465,13 @@ impl Config {
         self.profiles.iter().find(|p| p.matches(m))
     }
 
+    // Добавляет домен в списки TLS-профилей по 443 порту, у которых есть свой список и обход.
+    pub fn desync_host(&mut self, host: &str) {
+        for p in self.profiles.iter_mut().filter(|p| in_ports(&p.tcp, 443) && !p.include.is_empty() && p.desync.active()) {
+            p.include.add(host);
+        }
+    }
+
     // Фильтр WinDivert: исходящие данные и SYN на нужные порты, входящие SYN-ACK (для autottl и wssize).
     pub fn filter(&self) -> String {
         let mut out = vec![];
@@ -494,6 +501,15 @@ pub mod tests {
 
     pub fn args(s: &str) -> Vec<String> {
         s.split_whitespace().map(String::from).collect()
+    }
+
+    #[test]
+    fn extra_host_joins_tls_profiles() {
+        let mut c = parse(&args("--wf-tcp=443 --filter-tcp=443 --hostlist-domains=discord.com --dpi-desync=multisplit --dpi-desync-split-pos=1 --new --filter-udp=443 --dpi-desync=fake")).unwrap();
+        let m = Match { udp: false, port: 443, ip: &[1, 2, 3, 4], l7: L7::Tls, host: Some("relay.example.net") };
+        assert!(c.pick(&m).is_none());
+        c.desync_host("relay.example.net");
+        assert!(c.pick(&m).is_some());
     }
 
     #[test]

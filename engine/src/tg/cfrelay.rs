@@ -29,6 +29,10 @@ impl Relay {
         Relay::parse(&text)
     }
 
+    pub fn host(&self) -> &str {
+        &self.host
+    }
+
     fn parse(text: &str) -> Option<Relay> {
         let mut it = text.split_whitespace();
         let host = it.next()?.trim_start_matches("wss://").trim_start_matches("https://").trim_end_matches('/');
