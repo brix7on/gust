@@ -3,6 +3,7 @@
 //
 // Logic ported from the Python project tg-ws-proxy (Flowseal), MIT — see THIRD_PARTY_NOTICES.md.
 
+pub mod cfrelay;
 pub mod obfs;
 pub mod pool;
 pub mod splitter;
@@ -54,6 +55,7 @@ pub struct Config {
     pub log: Arc<dyn Fn(String) + Send + Sync>,
     pub roots: Option<Arc<RootCertStore>>,
     pub dial: Option<Arc<Dial>>,
+    pub relay: Option<cfrelay::Relay>,
 }
 
 impl Config {
@@ -82,6 +84,7 @@ impl Config {
             log,
             roots: None,
             dial: None,
+            relay: None,
         }
     }
 }
@@ -310,6 +313,18 @@ async fn handle(sh: Arc<Shared>, mut c: TcpStream) {
     let relay = obfs::make_relay_init(&h.proto_tag, h.dc_idx);
     let (up, down) = obfs::new_crypto(&h.prekey_iv, &sh.secret, &relay);
     let k = PoolKey { dc: h.dc, media: h.media, test: h.test };
+
+    // 0) hosted relay (when configured)
+    if let Some(r) = sh.cfg.relay.as_ref().filter(|_| !h.test) {
+        if let Some(ws) = cfrelay::connect(&sh, r, k).await {
+            if ws.send(&[relay.to_vec()]).await.is_ok() {
+                sh.st.via_ws.fetch_add(1, Relaxed);
+                bridge_ws(&sh, c, ws, up, down, Splitter::new(&h.proto_tag), "по WebSocket", h.media).await;
+                return;
+            }
+            ws.close().await;
+        }
+    }
 
     // 1) WebSocket to Telegram (main path)
     if let Some(ip) = sh.cfg.dc_redirects.get(&h.dc).cloned() {
@@ -560,7 +575,8 @@ pub fn run_cli(args: &[String]) -> i32 {
         }
     };
     rt.block_on(async move {
-        let cfg = Config::new(port, &secret, pool, Arc::new(|m| emit(&format!("log: {}", m.replace('\n', " ")))));
+        let mut cfg = Config::new(port, &secret, pool, Arc::new(|m| emit(&format!("log: {}", m.replace('\n', " ")))));
+        cfg.relay = cfrelay::Relay::load();
         let srv = match start(cfg).await {
             Ok(s) => s,
             Err(e) if e.kind() == io::ErrorKind::AddrInUse => {
